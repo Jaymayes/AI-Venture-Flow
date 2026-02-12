@@ -22,8 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Copy node_modules from builder (includes compiled better-sqlite3)
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json ./
 
 # Copy built client and server
 COPY --from=builder /app/client/dist ./client/dist
