@@ -12,6 +12,7 @@ import TermsOfUse from "./pages/TermsOfUse";
 import CookiePolicy from "./pages/CookiePolicy";
 import Disclaimer from "./pages/Disclaimer";
 import Accessibility from "./pages/Accessibility";
+import AcceptableUse from "./pages/AcceptableUse";
 import AuthGate from "./components/AuthGate";
 import ChatPanel from "./components/ChatPanel";
 import LegalFooter from "./components/LegalFooter";
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/cookies" component={CookiePolicy} />
           <Route path="/disclaimer" component={Disclaimer} />
           <Route path="/accessibility" component={Accessibility} />
+          <Route path="/aup" component={AcceptableUse} />
         </Switch>
       </div>
       <LegalFooter />

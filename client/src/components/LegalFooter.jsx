@@ -5,6 +5,7 @@ import {
   Cookie,
   AlertTriangle,
   Eye,
+  ShieldAlert,
   Zap,
   Bot,
 } from "lucide-react";
@@ -15,6 +16,7 @@ const legalLinks = [
   { href: "/cookies", label: "Cookie Policy", icon: Cookie },
   { href: "/disclaimer", label: "Disclaimer", icon: AlertTriangle },
   { href: "/accessibility", label: "Accessibility", icon: Eye },
+  { href: "/aup", label: "Acceptable Use", icon: ShieldAlert },
 ];
 
 const siteLinks = [
