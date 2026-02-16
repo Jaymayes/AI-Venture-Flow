@@ -13,6 +13,7 @@ import {
   Globe,
   Lock,
   ChevronRight,
+  FileText,
   Menu,
   X,
 } from "lucide-react";
@@ -124,7 +125,7 @@ export default function Landing() {
           </Link>
 
           {/* desktop links */}
-          <div className="hidden items-center gap-8 md:flex">
+          <div className="hidden items-center gap-6 md:flex">
             {navLinks.map((l) => (
               <button
                 key={l}
@@ -139,6 +140,30 @@ export default function Landing() {
               className="text-sm text-white/70 transition hover:text-white"
             >
               Dashboard
+            </Link>
+
+            {/* ── CEO Protected Pages ── */}
+            <div className="flex items-center gap-1 pl-2 border-l border-white/10">
+              <Lock size={12} className="text-white/20" />
+            </div>
+            <Link
+              href="/ceo"
+              className="flex items-center gap-1.5 text-sm font-semibold text-emerald-400 transition hover:text-white"
+            >
+              <Shield size={14} /> CEO
+            </Link>
+            <Link
+              href="/briefings"
+              className="flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition hover:text-white"
+            >
+              <FileText size={14} /> Briefings
+            </Link>
+
+            <Link
+              href="/recruit"
+              className="flex items-center gap-1.5 text-sm font-semibold text-accent transition hover:text-white"
+            >
+              <Zap size={14} /> Hiring
             </Link>
             <button
               onClick={() => scrollTo("modules")}
@@ -180,6 +205,20 @@ export default function Landing() {
             >
               Dashboard
             </Link>
+            <div className="border-t border-white/10 mt-2 pt-2">
+              <Link
+                href="/ceo"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-emerald-400 hover:text-white"
+              >
+                <Shield size={14} /> CEO Dashboard
+              </Link>
+              <Link
+                href="/briefings"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-cyan-400 hover:text-white"
+              >
+                <FileText size={14} /> Lead Briefings
+              </Link>
+            </div>
           </motion.div>
         )}
       </nav>
@@ -494,7 +533,7 @@ export default function Landing() {
               AI Digital Employees for modern ventures.
             </p>
           </div>
-          <div className="flex gap-6 text-sm text-white/50">
+          <div className="flex flex-wrap gap-6 text-sm text-white/50">
             {navLinks.map((l) => (
               <button
                 key={l}
@@ -506,6 +545,12 @@ export default function Landing() {
             ))}
             <Link href="/dashboard" className="transition hover:text-white">
               Dashboard
+            </Link>
+            <Link href="/ceo" className="transition hover:text-emerald-400">
+              CEO
+            </Link>
+            <Link href="/briefings" className="transition hover:text-cyan-400">
+              Briefings
             </Link>
           </div>
           <p className="text-xs text-white/30">
