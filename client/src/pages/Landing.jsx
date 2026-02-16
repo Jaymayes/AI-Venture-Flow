@@ -524,41 +524,6 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* ══════════ FOOTER ══════════ */}
-      <footer className="relative z-10 border-t border-white/10 px-6 py-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
-          <div>
-            <div className="text-lg font-bold">Referral Service LLC</div>
-            <p className="mt-1 text-xs text-white/40">
-              AI Digital Employees for modern ventures.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-6 text-sm text-white/50">
-            {navLinks.map((l) => (
-              <button
-                key={l}
-                onClick={() => scrollTo(l.toLowerCase())}
-                className="transition hover:text-white"
-              >
-                {l}
-              </button>
-            ))}
-            <Link href="/dashboard" className="transition hover:text-white">
-              Dashboard
-            </Link>
-            <Link href="/ceo" className="transition hover:text-emerald-400">
-              CEO
-            </Link>
-            <Link href="/briefings" className="transition hover:text-cyan-400">
-              Briefings
-            </Link>
-          </div>
-          <p className="text-xs text-white/30">
-            &copy; {new Date().getFullYear()} Referral Service LLC. All rights
-            reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
