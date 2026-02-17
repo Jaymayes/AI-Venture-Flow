@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Megaphone,
@@ -26,6 +26,9 @@ import {
 // ---------------------------------------------------------------------------
 const INGEST_URL =
   "https://moltbot-triage-engine.jamarr.workers.dev/api/ingest/csv";
+const PIPELINE_URL =
+  "https://moltbot-triage-engine.jamarr.workers.dev/api/pipeline/status";
+const POLL_INTERVAL_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Animation Variants
@@ -37,109 +40,28 @@ const fadeUp = {
 const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
 
 // ---------------------------------------------------------------------------
-// Mock Data (Pipeline table — will be replaced by live endpoint later)
+// Pipeline stage → UI status mapping
 // ---------------------------------------------------------------------------
-const topStats = [
-  {
-    icon: Megaphone,
-    label: "Active Outbound Campaigns",
-    value: "4",
-    sub: "2 SMS / 2 Email",
-    color: "text-accent",
-    bg: "from-accent/20 to-accent/5",
-  },
-  {
-    icon: Users,
-    label: "Candidates in BQM Stage",
-    value: "12",
-    sub: "3 above threshold",
-    color: "text-cyan-400",
-    bg: "from-cyan-400/20 to-cyan-400/5",
-  },
-  {
-    icon: Boxes,
-    label: "Deployed Pods",
-    value: "2",
-    sub: "1 pending activation",
-    color: "text-violet-400",
-    bg: "from-violet-400/20 to-violet-400/5",
-  },
-];
+const stageToStatus = {
+  enqueued:   { label: "Enqueued",   statusType: "pending"  },
+  processing: { label: "Processing", statusType: "active"   },
+  dispatched: { label: "Dispatched", statusType: "deployed" },
+  halted:     { label: "Halted",     statusType: "stale"    },
+  failed:     { label: "Failed",     statusType: "stale"    },
+};
 
-const pipelineCandidates = [
-  {
-    name: "Marcus Okafor",
-    role: "Fractional CRO",
-    intent: 92,
-    status: "BQM Scheduled",
-    statusType: "success",
-    channel: "SMS",
-    lastTouch: "2h ago",
-  },
-  {
-    name: "Danielle Reeves",
-    role: "VP of Sales",
-    intent: 88,
-    status: "Reply Received",
-    statusType: "active",
-    channel: "Email",
-    lastTouch: "4h ago",
-  },
-  {
-    name: "Terrence Hall",
-    role: "Enterprise AE",
-    intent: 79,
-    status: "Outreach Sent",
-    statusType: "pending",
-    channel: "SMS",
-    lastTouch: "1d ago",
-  },
-  {
-    name: "Angela Chen",
-    role: "Partner Sales Lead",
-    intent: 85,
-    status: "Reply Received",
-    statusType: "active",
-    channel: "Email",
-    lastTouch: "6h ago",
-  },
-  {
-    name: "Kevin Brooks",
-    role: "Strategic Accounts",
-    intent: 71,
-    status: "Outreach Sent",
-    statusType: "pending",
-    channel: "SMS",
-    lastTouch: "2d ago",
-  },
-  {
-    name: "Jasmine Watts",
-    role: "Fractional VP Sales",
-    intent: 94,
-    status: "Pod Deployed",
-    statusType: "deployed",
-    channel: "Email",
-    lastTouch: "12h ago",
-  },
-  {
-    name: "Derek Simmons",
-    role: "Regional Sales Dir.",
-    intent: 67,
-    status: "No Response",
-    statusType: "stale",
-    channel: "SMS",
-    lastTouch: "5d ago",
-  },
-  {
-    name: "Natasha Williams",
-    role: "Channel Partnerships",
-    intent: 82,
-    status: "BQM Scheduled",
-    statusType: "success",
-    channel: "Email",
-    lastTouch: "8h ago",
-  },
-];
+/** Format ISO timestamp to relative "Xh ago" / "Xd ago" string. */
+function timeAgo(iso) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 // Actual CSV schema required by the Triage Engine backend
 const csvSchema = [
@@ -212,6 +134,89 @@ export default function RecruitmentOps() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+
+  // ── Pipeline state (live from Triage Engine) ──
+  const [pipelineData, setPipelineData] = useState(null);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
+
+  // ── Poll pipeline status every 30s ──
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchPipeline() {
+      try {
+        const res = await fetch(PIPELINE_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setPipelineData(data);
+          setPipelineLoading(false);
+        }
+      } catch (err) {
+        console.warn("[RecruitmentOps] Pipeline poll failed:", err.message);
+        if (!cancelled) setPipelineLoading(false);
+      }
+    }
+
+    fetchPipeline();
+    const interval = setInterval(fetchPipeline, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Also refresh pipeline after successful CSV upload
+  useEffect(() => {
+    if (!uploadResult) return;
+    // Short delay to let queue consumer start
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(PIPELINE_URL);
+        if (res.ok) {
+          const data = await res.json();
+          setPipelineData(data);
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [uploadResult]);
+
+  // ── Derived stats from live pipeline data ──
+  const summary = pipelineData?.summary ?? {
+    total: 0, enqueued: 0, processing: 0, dispatched: 0, halted: 0, failed: 0,
+  };
+  const prospects = pipelineData?.prospects ?? [];
+  const smsCount = prospects.filter((p) => p.channel === "sms").length;
+  const emailCount = prospects.filter((p) => p.channel === "email").length;
+
+  const topStats = [
+    {
+      icon: Megaphone,
+      label: "Total Prospects",
+      value: String(summary.total),
+      sub: `${smsCount} SMS / ${emailCount} Email`,
+      color: "text-accent",
+      bg: "from-accent/20 to-accent/5",
+    },
+    {
+      icon: Users,
+      label: "Enqueued / Processing",
+      value: String(summary.enqueued + summary.processing),
+      sub: `${summary.enqueued} queued · ${summary.processing} active`,
+      color: "text-cyan-400",
+      bg: "from-cyan-400/20 to-cyan-400/5",
+    },
+    {
+      icon: Boxes,
+      label: "Dispatched / Halted",
+      value: String(summary.dispatched),
+      sub: `${summary.halted} halted · ${summary.failed} failed`,
+      color: "text-violet-400",
+      bg: "from-violet-400/20 to-violet-400/5",
+    },
+  ];
 
   // ── Clear feedback after delay ──
   const clearFeedback = useCallback((delayMs = 8000) => {
@@ -648,112 +653,121 @@ export default function RecruitmentOps() {
             </div>
           </motion.div>
 
-          {/* ── Candidate Pipeline Table (3 cols) ── */}
+          {/* ── Prospect Pipeline Table (3 cols) — Live from Triage Engine ── */}
           <motion.div variants={fadeUp} className="lg:col-span-3">
             <div className="glass noise rounded-2xl p-6">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <UserCheck size={18} className="text-violet-400" />
-                  <h2 className="text-lg font-bold">Candidate Pipeline</h2>
+                  <h2 className="text-lg font-bold">Prospect Pipeline</h2>
                 </div>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/40">
-                  {pipelineCandidates.length} candidates
+                  {pipelineLoading ? "..." : `${prospects.length} prospects`}
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/[0.08]">
-                      <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
-                        Candidate
-                      </th>
-                      <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
-                        Intent
-                      </th>
-                      <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
-                        Status
-                      </th>
-                      <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
-                        Channel
-                      </th>
-                      <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
-                        Last Touch
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pipelineCandidates.map((c) => {
-                      const cfg = statusConfig[c.statusType];
-                      return (
-                        <tr
-                          key={c.name}
-                          className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
-                        >
-                          {/* Name + role */}
-                          <td className="py-3 pr-4">
-                            <div className="font-semibold text-white">
-                              {c.name}
-                            </div>
-                            <div className="text-xs text-white/40">
-                              {c.role}
-                            </div>
-                          </td>
-
-                          {/* Intent score bar */}
-                          <td className="py-3 pr-4">
-                            <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                                <div
-                                  className={`h-full rounded-full ${intentBg(c.intent)}`}
-                                  style={{ width: `${c.intent}%` }}
-                                />
+              {pipelineLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={24} className="animate-spin text-violet-400" />
+                  <span className="ml-3 text-sm text-white/40">Loading pipeline...</span>
+                </div>
+              ) : prospects.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Users size={32} className="text-white/10 mb-3" />
+                  <p className="text-sm text-white/40 mb-1">No prospects in pipeline</p>
+                  <p className="text-xs text-white/25">Upload a CSV to begin outbound sequences</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.08]">
+                        <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
+                          Prospect
+                        </th>
+                        <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
+                          Stage
+                        </th>
+                        <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
+                          Channel
+                        </th>
+                        <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
+                          Source
+                        </th>
+                        <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">
+                          Updated
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prospects.map((p) => {
+                        const mapping = stageToStatus[p.stage] ?? stageToStatus.enqueued;
+                        const cfg = statusConfig[mapping.statusType];
+                        return (
+                          <tr
+                            key={p.ingestionId}
+                            className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
+                          >
+                            {/* Name + company + role */}
+                            <td className="py-3 pr-4">
+                              <div className="font-semibold text-white">
+                                {p.name}
                               </div>
+                              <div className="text-xs text-white/40">
+                                {p.role} @ {p.company}
+                              </div>
+                            </td>
+
+                            {/* Stage badge */}
+                            <td className="py-3 pr-4">
                               <span
-                                className={`text-xs font-bold ${intentColor(c.intent)}`}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.bg} ${cfg.text}`}
                               >
-                                {c.intent}
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`}
+                                />
+                                {mapping.label}
                               </span>
-                            </div>
-                          </td>
+                              {p.haltReason && (
+                                <p className="text-[10px] text-red-400/60 mt-0.5 max-w-[140px] truncate" title={p.haltReason}>
+                                  {p.haltReason}
+                                </p>
+                              )}
+                            </td>
 
-                          {/* Status badge */}
-                          <td className="py-3 pr-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.bg} ${cfg.text}`}
-                            >
+                            {/* Channel */}
+                            <td className="py-3 pr-4">
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`}
-                              />
-                              {c.status}
-                            </span>
-                          </td>
+                                className={`text-xs font-medium ${
+                                  p.channel === "sms"
+                                    ? "text-blue-400"
+                                    : "text-purple-400"
+                                }`}
+                              >
+                                {p.channel.toUpperCase()}
+                              </span>
+                            </td>
 
-                          {/* Channel */}
-                          <td className="py-3 pr-4">
-                            <span
-                              className={`text-xs font-medium ${
-                                c.channel === "SMS"
-                                  ? "text-blue-400"
-                                  : "text-purple-400"
-                              }`}
-                            >
-                              {c.channel}
-                            </span>
-                          </td>
+                            {/* Source / batch */}
+                            <td className="py-3 pr-4">
+                              <span className="text-xs text-white/30 font-mono">
+                                {p.source ?? "—"}
+                              </span>
+                            </td>
 
-                          {/* Last touch */}
-                          <td className="py-3">
-                            <span className="text-xs text-white/40">
-                              {c.lastTouch}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            {/* Updated */}
+                            <td className="py-3">
+                              <span className="text-xs text-white/40">
+                                {timeAgo(p.updatedAt)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
