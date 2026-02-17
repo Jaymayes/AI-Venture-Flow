@@ -29,8 +29,7 @@ const siteLinks = [
 
 const protectedLinks = [
   { href: "/ceo", label: "CEO Dashboard", color: "text-emerald-400/70 hover:text-emerald-400" },
-  { href: "/briefings", label: "Briefings", color: "text-cyan-400/70 hover:text-cyan-400" },
-  { href: "/recruiting-ops", label: "SP Pipeline", color: "text-violet-400/70 hover:text-violet-400" },
+  { href: "/playbook", label: "Sovereign Playbook", color: "text-amber-400/70 hover:text-amber-400" },
 ];
 
 export default function LegalFooter() {

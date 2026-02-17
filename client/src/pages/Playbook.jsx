@@ -21,8 +21,10 @@ import {
   Award,
   Eye,
   FileCheck,
+  ArrowLeft,
+  BookOpen,
 } from "lucide-react";
-import CEONav from "../components/CEONav";
+import { Link } from "wouter";
 
 // ---------------------------------------------------------------------------
 // Animation
@@ -730,8 +732,24 @@ export default function Playbook() {
         <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-primary/10 blur-[120px]" />
       </div>
 
-      {/* CEO Tab Nav */}
-      <CEONav />
+      {/* SP Training Header */}
+      <div className="glass noise sticky top-0 z-50 border-b border-white/10">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="flex items-center justify-between py-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-white/40 transition hover:text-white"
+            >
+              <ArrowLeft size={14} />
+              Back to Home
+            </Link>
+            <div className="flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/5 px-3 py-1 text-xs text-amber-400/60">
+              <BookOpen size={10} />
+              SP Training Portal
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-8">

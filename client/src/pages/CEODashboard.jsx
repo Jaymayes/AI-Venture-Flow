@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import CEONav from "../components/CEONav";
+import Briefings from "./Briefings";
+import RecruitmentOps from "./RecruitmentOps";
 import {
   ArrowLeft,
   Activity,
@@ -14,10 +15,12 @@ import {
   ScanSearch,
   ShieldAlert,
   RotateCcw,
-  Gauge,
   PieChart,
   Network,
   RefreshCw,
+  FileText,
+  Users,
+  Lock,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -251,10 +254,39 @@ function Section({ icon: Icon, title, subtitle }) {
 }
 
 // ===========================================================================
+// Internal Tab System
+// ===========================================================================
+
+const ceoTabs = [
+  { id: "dashboard", label: "Dashboard", icon: Activity, color: "emerald" },
+  { id: "briefings", label: "Lead Briefings", icon: FileText, color: "cyan" },
+  { id: "recruiting", label: "Recruitment Ops", icon: Users, color: "violet" },
+];
+
+const colorMap = {
+  emerald: {
+    active: "border-emerald-400 text-emerald-400 bg-emerald-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-emerald-400",
+  },
+  cyan: {
+    active: "border-cyan-400 text-cyan-400 bg-cyan-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-cyan-400",
+  },
+  violet: {
+    active: "border-violet-400 text-violet-400 bg-violet-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-violet-400",
+  },
+};
+
+// ===========================================================================
 // CEO Dashboard Page
 // ===========================================================================
 
 export default function CEODashboard() {
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -281,18 +313,6 @@ export default function CEODashboard() {
     return () => clearInterval(id);
   }, []);
 
-  // ----- loading / fatal states -----
-  if (loading && !metrics) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <RefreshCw size={32} className="mx-auto animate-spin text-primary" />
-          <p className="mt-4 text-sm text-white/40">Loading FinOps telemetry...</p>
-        </div>
-      </div>
-    );
-  }
-
   const m = metrics ?? {};
   const ue = m.unitEconomics ?? {};
   const sr = m.semanticRouting ?? {};
@@ -318,9 +338,59 @@ export default function CEODashboard() {
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-accent/10 blur-[120px]" />
       </div>
 
-      {/* CEO Tab Nav */}
-      <CEONav />
+      {/* ── Internal Tab Bar (replaces CEONav) ── */}
+      <div className="glass noise sticky top-0 z-50 border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-6">
+          {/* Top bar with back link + lock badge */}
+          <div className="flex items-center justify-between py-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-white/40 transition hover:text-white"
+            >
+              <ArrowLeft size={14} />
+              Back to Home
+            </Link>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/30">
+              <Lock size={10} />
+              Executive Access
+            </div>
+          </div>
 
+          {/* Tab buttons */}
+          <div className="flex gap-1 overflow-x-auto pb-0 -mb-px">
+            {ceoTabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const colors = colorMap[tab.color];
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition ${
+                    isActive ? colors.active : colors.idle
+                  }`}
+                >
+                  <tab.icon size={15} className={isActive ? colors.icon : "text-white/30"} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tab Content ── */}
+      {activeTab === "briefings" && <Briefings />}
+      {activeTab === "recruiting" && <RecruitmentOps />}
+
+      {activeTab === "dashboard" && (
+      loading && !metrics ? (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <RefreshCw size={32} className="mx-auto animate-spin text-primary" />
+            <p className="mt-4 text-sm text-white/40">Loading FinOps telemetry...</p>
+          </div>
+        </div>
+      ) : (
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-8">
         {/* ── Header ── */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -600,6 +670,7 @@ export default function CEODashboard() {
           Clawbot FinOps 2.0 &middot; Referral Service LLC &middot; Zero-Egress Edge Architecture
         </div>
       </div>
+      ))}
     </div>
   );
 }

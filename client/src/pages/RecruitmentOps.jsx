@@ -14,8 +14,6 @@ import {
   UserCheck,
   AlertCircle,
 } from "lucide-react";
-import CEONav from "../components/CEONav";
-
 // ---------------------------------------------------------------------------
 // Animation Variants
 // ---------------------------------------------------------------------------
@@ -194,18 +192,6 @@ const intentBg = (score) => {
 // ===========================================================================
 export default function RecruitmentOps() {
   return (
-    <div className="relative min-h-screen">
-      {/* Ambient */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-primary/20 blur-[160px]" />
-        <div className="absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full bg-violet-500/10 blur-[140px]" />
-        <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-accent/10 blur-[120px]" />
-      </div>
-
-      {/* CEO Tab Nav */}
-      <CEONav />
-
-      {/* Main Content */}
       <div className="relative z-10 mx-auto max-w-7xl px-6 py-8">
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           {/* ── Header ── */}
@@ -460,6 +446,5 @@ export default function RecruitmentOps() {
           </div>
         </motion.div>
       </div>
-    </div>
   );
 }

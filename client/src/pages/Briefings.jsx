@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import CEONav from "../components/CEONav";
 import {
-  ArrowLeft,
   FileText,
   Phone,
   Target,
@@ -607,10 +604,6 @@ export default function Briefings() {
   }, [selectedId, fetchDetail]);
 
   return (
-    <div className="min-h-screen">
-      {/* CEO Tab Nav */}
-      <CEONav />
-
       <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
       {/* Header */}
       <motion.div
@@ -748,6 +741,5 @@ export default function Briefings() {
         />
       )}
       </div>
-    </div>
   );
 }

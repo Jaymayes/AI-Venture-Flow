@@ -6,28 +6,35 @@ import CEODashboard from "./pages/CEODashboard";
 import Recruit from "./pages/Recruit";
 import Outreach from "./pages/Outreach";
 import BQM from "./pages/BQM";
-import Briefings from "./pages/Briefings";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import CookiePolicy from "./pages/CookiePolicy";
 import Disclaimer from "./pages/Disclaimer";
 import Accessibility from "./pages/Accessibility";
 import AcceptableUse from "./pages/AcceptableUse";
-import RecruitmentOps from "./pages/RecruitmentOps";
 import Playbook from "./pages/Playbook";
 import AuthGate from "./components/AuthGate";
+import SPGate from "./components/SPGate";
 import ChatPanel from "./components/ChatPanel";
 import LegalFooter from "./components/LegalFooter";
 import "./index.css";
 
 // ---------------------------------------------------------------------------
-// Protected Route wrapper — requires CEO authentication
+// Protected Route wrappers
 // ---------------------------------------------------------------------------
 function ProtectedRoute({ component: Component }) {
   return (
     <AuthGate>
       <Component />
     </AuthGate>
+  );
+}
+
+function SPProtectedRoute({ component: Component }) {
+  return (
+    <SPGate>
+      <Component />
+    </SPGate>
   );
 }
 
@@ -42,14 +49,8 @@ export default function App() {
           <Route path="/ceo">
             <ProtectedRoute component={CEODashboard} />
           </Route>
-          <Route path="/briefings">
-            <ProtectedRoute component={Briefings} />
-          </Route>
-          <Route path="/recruiting-ops">
-            <ProtectedRoute component={RecruitmentOps} />
-          </Route>
           <Route path="/playbook">
-            <ProtectedRoute component={Playbook} />
+            <SPProtectedRoute component={Playbook} />
           </Route>
           <Route path="/recruit" component={Recruit} />
           <Route path="/outreach" component={Outreach} />

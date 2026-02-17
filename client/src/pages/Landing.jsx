@@ -13,7 +13,6 @@ import {
   Globe,
   Lock,
   ChevronRight,
-  FileText,
   Menu,
   X,
 } from "lucide-react";
@@ -153,16 +152,10 @@ export default function Landing() {
               <Shield size={14} /> CEO
             </Link>
             <Link
-              href="/briefings"
-              className="flex items-center gap-1.5 text-sm font-semibold text-cyan-400 transition hover:text-white"
+              href="/playbook"
+              className="flex items-center gap-1.5 text-sm font-semibold text-amber-400 transition hover:text-white"
             >
-              <FileText size={14} /> Briefings
-            </Link>
-            <Link
-              href="/recruiting-ops"
-              className="flex items-center gap-1.5 text-sm font-semibold text-violet-400 transition hover:text-white"
-            >
-              <Users size={14} /> SP Pipeline
+              <BookOpen size={14} /> Playbook
             </Link>
 
             <Link
@@ -219,16 +212,10 @@ export default function Landing() {
                 <Shield size={14} /> CEO Dashboard
               </Link>
               <Link
-                href="/briefings"
-                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-cyan-400 hover:text-white"
+                href="/playbook"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-amber-400 hover:text-white"
               >
-                <FileText size={14} /> Lead Briefings
-              </Link>
-              <Link
-                href="/recruiting-ops"
-                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-violet-400 hover:text-white"
-              >
-                <Users size={14} /> SP Pipeline
+                <BookOpen size={14} /> Sovereign Playbook
               </Link>
             </div>
           </motion.div>
