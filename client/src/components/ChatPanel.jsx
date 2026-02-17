@@ -40,7 +40,7 @@ export default function ChatPanel() {
       if (data.leadId) setLeadId(data.leadId);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.reply || data.message || "Thanks for reaching out!" },
+        { role: "assistant", content: (typeof data.reply === "string" ? data.reply : data.reply?.text) || data.message || "Thanks for reaching out!" },
       ]);
     } catch {
       setMessages((prev) => [
