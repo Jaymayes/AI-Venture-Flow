@@ -118,6 +118,79 @@ export default function TermsOfUse() {
                 </p>
               </section>
 
+              {/* 4B — SMS Messaging Program */}
+              <section>
+                <h2 className="mb-3 text-lg font-bold text-white">
+                  4B. SMS Messaging Program
+                </h2>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                  <p className="font-semibold text-white/90 mb-2">
+                    Program Name
+                  </p>
+                  <p>
+                    Referral Service LLC Talent Outreach Program
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Program Description
+                  </p>
+                  <p>
+                    Referral Service LLC sends personalized SMS messages to
+                    business professionals regarding talent referral and
+                    recruitment opportunities. Messages are initiated by
+                    authorized company operators.
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Message Frequency
+                  </p>
+                  <p>
+                    Message frequency varies. Typically 1-3 messages per
+                    prospect engagement. This is not a recurring subscription
+                    program.
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Message and Data Rates
+                  </p>
+                  <p>
+                    Standard message and data rates may apply. Contact your
+                    wireless carrier for details about your messaging plan.
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Opt-Out
+                  </p>
+                  <p>
+                    To stop receiving messages, reply{" "}
+                    <strong className="text-white">STOP</strong> to any
+                    message. You will receive a one-time confirmation message
+                    and no further messages will be sent.
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Help
+                  </p>
+                  <p>
+                    For support, reply{" "}
+                    <strong className="text-white">HELP</strong> to any
+                    message, or contact us at support@referralsvc.com.
+                  </p>
+
+                  <p className="font-semibold text-white/90 mb-2 mt-4">
+                    Privacy
+                  </p>
+                  <p>
+                    Your information will not be shared with third parties for
+                    marketing purposes. See our full{" "}
+                    <Link href="/privacy" className="text-primary underline">
+                      Privacy Policy
+                    </Link>{" "}
+                    for details.
+                  </p>
+                </div>
+              </section>
+
               {/* 5 — AI Limitation of Liability */}
               <section>
                 <h2 className="mb-3 text-lg font-bold text-white">
