@@ -3,6 +3,7 @@ import {
   Activity,
   FileText,
   Users,
+  BookOpen,
   ArrowLeft,
   Lock,
 } from "lucide-react";
@@ -11,6 +12,7 @@ const tabs = [
   { href: "/ceo", label: "CEO Dashboard", icon: Activity, color: "emerald" },
   { href: "/briefings", label: "Lead Briefings", icon: FileText, color: "cyan" },
   { href: "/recruiting-ops", label: "Recruitment Ops", icon: Users, color: "violet" },
+  { href: "/playbook", label: "Sovereign Playbook", icon: BookOpen, color: "amber" },
 ];
 
 const colorMap = {
@@ -28,6 +30,11 @@ const colorMap = {
     active: "border-violet-400 text-violet-400 bg-violet-400/10",
     idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
     icon: "text-violet-400",
+  },
+  amber: {
+    active: "border-amber-400 text-amber-400 bg-amber-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-amber-400",
   },
 };
 
