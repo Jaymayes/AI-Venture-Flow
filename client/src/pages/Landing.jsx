@@ -158,6 +158,12 @@ export default function Landing() {
             >
               <FileText size={14} /> Briefings
             </Link>
+            <Link
+              href="/recruiting-ops"
+              className="flex items-center gap-1.5 text-sm font-semibold text-violet-400 transition hover:text-white"
+            >
+              <Users size={14} /> SP Pipeline
+            </Link>
 
             <Link
               href="/recruit"
@@ -217,6 +223,12 @@ export default function Landing() {
                 className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-cyan-400 hover:text-white"
               >
                 <FileText size={14} /> Lead Briefings
+              </Link>
+              <Link
+                href="/recruiting-ops"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-violet-400 hover:text-white"
+              >
+                <Users size={14} /> SP Pipeline
               </Link>
             </div>
           </motion.div>

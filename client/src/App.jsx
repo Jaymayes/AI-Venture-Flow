@@ -13,6 +13,7 @@ import CookiePolicy from "./pages/CookiePolicy";
 import Disclaimer from "./pages/Disclaimer";
 import Accessibility from "./pages/Accessibility";
 import AcceptableUse from "./pages/AcceptableUse";
+import RecruitmentOps from "./pages/RecruitmentOps";
 import AuthGate from "./components/AuthGate";
 import ChatPanel from "./components/ChatPanel";
 import LegalFooter from "./components/LegalFooter";
@@ -42,6 +43,9 @@ export default function App() {
           </Route>
           <Route path="/briefings">
             <ProtectedRoute component={Briefings} />
+          </Route>
+          <Route path="/recruiting-ops">
+            <ProtectedRoute component={RecruitmentOps} />
           </Route>
           <Route path="/recruit" component={Recruit} />
           <Route path="/outreach" component={Outreach} />

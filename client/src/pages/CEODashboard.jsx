@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import CEONav from "../components/CEONav";
 import {
   ArrowLeft,
   Activity,
@@ -310,22 +311,20 @@ export default function CEODashboard() {
   const edgeTargetMet = edgeRatio >= 0.8;
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8">
+    <div className="min-h-screen">
       {/* ambient background */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-primary/10 blur-[120px]" />
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-accent/10 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl">
+      {/* CEO Tab Nav */}
+      <CEONav />
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-8">
         {/* ── Header ── */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Link href="/">
-              <button className="flex items-center gap-1 text-sm text-white/50 transition hover:text-white">
-                <ArrowLeft size={16} /> Home
-              </button>
-            </Link>
             <div>
               <h1 className="text-2xl font-bold md:text-3xl">
                 <span className="gradient-text">FinOps 2.0</span> CEO Dashboard

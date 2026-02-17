@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import CEONav from "../components/CEONav";
 import {
   ArrowLeft,
   FileText,
@@ -606,7 +607,11 @@ export default function Briefings() {
   }, [selectedId, fetchDetail]);
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-8 max-w-7xl mx-auto">
+    <div className="min-h-screen">
+      {/* CEO Tab Nav */}
+      <CEONav />
+
+      <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
       {/* Header */}
       <motion.div
         initial="hidden"
@@ -615,9 +620,6 @@ export default function Briefings() {
         className="mb-8"
       >
         <motion.div variants={fadeUp} className="flex items-center gap-3 mb-1">
-          <Link href="/ceo" className="text-white/40 hover:text-white/70 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
           <h1 className="text-3xl sm:text-4xl font-bold gradient-text">
             Lead Briefings
           </h1>
@@ -745,6 +747,7 @@ export default function Briefings() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }
