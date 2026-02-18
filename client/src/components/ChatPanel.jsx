@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -9,6 +9,12 @@ const WELCOME = {
     "Hi! I'm the Referral Service AI assistant. I can help you learn about our AI Digital Employees, get pricing info, or connect you with our team. How can I help you today?",
 };
 
+const DEAL_ARCHITECT_GREETING = {
+  role: "assistant",
+  content:
+    "I see you're interested in the Deal Architect partnership. Great — let's start with a few quick questions about your enterprise closing experience.\n\nWhat is your average deal size, and what industry do you primarily sell into?",
+};
+
 export default function ChatPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([WELCOME]);
@@ -17,11 +23,30 @@ export default function ChatPanel() {
   const [leadId, setLeadId] = useState(null);
   const scrollRef = useRef(null);
 
+  // ── Auto-scroll on new messages ──
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // ── Custom event listener: allows external components to open chat ──
+  const handleOpenChat = useCallback((e) => {
+    const intent = e.detail?.intent;
+
+    setOpen(true);
+
+    if (intent === "apply_deal_architect") {
+      // Reset conversation with Deal Architect interview flow
+      setMessages([DEAL_ARCHITECT_GREETING]);
+      setLeadId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("openChat", handleOpenChat);
+    return () => window.removeEventListener("openChat", handleOpenChat);
+  }, [handleOpenChat]);
 
   const send = async () => {
     const text = input.trim();
@@ -118,7 +143,7 @@ export default function ChatPanel() {
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line ${
                       m.role === "user"
                         ? "rounded-br-md bg-gradient-to-r from-primary to-accent text-black"
                         : "rounded-bl-md border border-white/10 bg-white/5 text-white/90"

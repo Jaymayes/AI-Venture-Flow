@@ -154,6 +154,11 @@ export default function Recruit() {
   const scrollTo = (id) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
+  const openApplyChat = () =>
+    window.dispatchEvent(
+      new CustomEvent("openChat", { detail: { intent: "apply_deal_architect" } })
+    );
+
   return (
     <div className="relative overflow-x-hidden">
       {/* ── Ambient gradients ── */}
@@ -179,12 +184,12 @@ export default function Recruit() {
             <button onClick={() => scrollTo("trust")} className="text-sm text-white/70 transition hover:text-white">
               Enterprise Trust
             </button>
-            <a
-              href="mailto:careers@referralservice.llc?subject=Deal%20Architect%20Application"
+            <button
+              onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-black transition hover:opacity-90"
             >
               Apply now
-            </a>
+            </button>
           </div>
         </div>
       </nav>
@@ -230,12 +235,12 @@ export default function Recruit() {
           </motion.p>
 
           <motion.div variants={fadeUp} custom={3} className="flex flex-wrap items-center justify-center gap-4">
-            <a
-              href="mailto:careers@referralservice.llc?subject=Deal%20Architect%20Application"
+            <button
+              onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
               Apply now
-            </a>
+            </button>
             <button
               onClick={() => scrollTo("how")}
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 font-semibold text-white transition hover:bg-white/10"
@@ -525,12 +530,12 @@ export default function Recruit() {
             Retainer + commission. 1099 independence. No cold calls, ever.
           </motion.p>
           <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-4">
-            <a
-              href="mailto:careers@referralservice.llc?subject=Deal%20Architect%20Application"
+            <button
+              onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
               Apply now
-            </a>
+            </button>
             <Link
               href="/"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 font-semibold text-white transition hover:bg-white/10"
