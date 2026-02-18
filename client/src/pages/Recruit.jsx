@@ -154,10 +154,13 @@ export default function Recruit() {
   const scrollTo = (id) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
-  const openApplyChat = () =>
+  const openApplyChat = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     window.dispatchEvent(
       new CustomEvent("openChat", { detail: { intent: "apply_deal_architect" } })
     );
+  };
 
   return (
     <div className="relative overflow-x-hidden">
@@ -185,6 +188,7 @@ export default function Recruit() {
               Enterprise Trust
             </button>
             <button
+              type="button"
               onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-black transition hover:opacity-90"
             >
@@ -236,6 +240,7 @@ export default function Recruit() {
 
           <motion.div variants={fadeUp} custom={3} className="flex flex-wrap items-center justify-center gap-4">
             <button
+              type="button"
               onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
@@ -531,6 +536,7 @@ export default function Recruit() {
           </motion.p>
           <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-4">
             <button
+              type="button"
               onClick={openApplyChat}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
