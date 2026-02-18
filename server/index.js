@@ -181,7 +181,14 @@ Ask these questions one at a time, in order. Wait for the candidate's answer bef
 5. "Are you currently employed, or available to start within the next 2 weeks?"
 
 AFTER ALL 5 QUESTIONS:
-Thank them warmly and say: "Great answers. I'm going to pass your profile to our CEO, Jamarr Mayes, for a final conversation. You'll hear from us within 48 hours. In the meantime, feel free to ask me anything about the role or Referral Service."
+Thank them warmly and say: "Great answers. I'd like to set up a brief call with our CEO, Jamarr Mayes, to discuss next steps. You can book a time here: https://calendly.com/referralsvc — we look forward to speaking with you!"
+
+CRITICAL RULES FOR QUESTION TRACKING:
+- Count how many of YOUR (assistant) messages in the conversation history contain questions from the list above
+- If you already asked Q2 and received an answer, your NEXT question MUST be Q3. Never go backwards.
+- Look at the conversation history carefully. If you see you already asked about "years of enterprise closing experience" or "quota above $500K", that means Q2 is DONE — move to Q3
+- If you see you already asked about "1099 independent contractor", Q3 is DONE — move to Q4
+- NEVER repeat a question the candidate has already answered
 
 CONVERSATION RULES:
 - Be warm, professional, and concise (2-3 sentences per response)
@@ -189,8 +196,7 @@ CONVERSATION RULES:
 - If the candidate asks about the role, comp, or company, answer clearly using the info above
 - Do NOT ask multiple questions at once — one question per message
 - Do NOT act as a customer service agent — you are interviewing them
-- If they give a short or vague answer, gently probe deeper before moving on
-- Track which question you're on based on conversation history`;
+- If they give a short or vague answer, gently probe deeper before moving on`;
 
 
 app.post("/api/chat", async (req, res) => {
@@ -213,6 +219,16 @@ app.post("/api/chat", async (req, res) => {
     logActivity(currentLeadId, "created", "Lead auto-captured from chat");
   }
 
+  // Auto-create lead for recruitment applicants so conversation history persists
+  if (!currentLeadId && intent === "apply_deal_architect") {
+    currentLeadId = uuid();
+    db.prepare(`
+      INSERT INTO leads (id, source, stage)
+      VALUES (?, 'recruit', 'inquiry')
+    `).run(currentLeadId);
+    logActivity(currentLeadId, "created", "Deal Architect applicant from /recruit");
+  }
+
   // Save user message
   const userMsgId = uuid();
   db.prepare("INSERT INTO messages (id, lead_id, role, text) VALUES (?, ?, 'user', ?)").run(userMsgId, currentLeadId, message);
@@ -229,6 +245,14 @@ app.post("/api/chat", async (req, res) => {
     }));
   } else {
     conversationHistory = [{ role: "user", content: message }];
+  }
+
+  // For recruitment interviews, prepend the greeting so the AI knows Q1 was already asked
+  if (intent === "apply_deal_architect" && conversationHistory.length <= 1) {
+    conversationHistory = [
+      { role: "assistant", content: "I see you're interested in the Deal Architect partnership. Great — let's start with a few quick questions about your enterprise closing experience.\n\nWhat is your average deal size, and what industry do you primarily sell into?" },
+      ...conversationHistory,
+    ];
   }
 
   // Select system prompt and model based on intent
