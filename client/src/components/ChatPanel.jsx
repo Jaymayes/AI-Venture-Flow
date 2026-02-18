@@ -3,6 +3,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
+/** Convert URLs in text to clickable <a> tags, preserving the rest as text */
+function renderMessageContent(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline font-medium hover:opacity-80"
+        style={{ wordBreak: "break-all" }}
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 const WELCOME = {
   role: "assistant",
   content:
@@ -152,7 +174,7 @@ export default function ChatPanel() {
                         : "rounded-bl-md border border-white/10 bg-white/5 text-white/90"
                     }`}
                   >
-                    {m.content}
+                    {renderMessageContent(m.content)}
                   </div>
                 </div>
               ))}
