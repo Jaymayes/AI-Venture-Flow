@@ -119,9 +119,49 @@ app.delete("/api/leads/:id", (req, res) => {
   res.json({ success: true });
 });
 
-// ─── Chat ────────────────────────────────────────────────────
+// ─── Chat (AI-powered via Cloudflare Workers AI) ────────────
 
-app.post("/api/chat", (req, res) => {
+const CHAT_SYSTEM_PROMPT = `You are the AI assistant for Referral Service LLC, an AI-Human Hybrid venture studio.
+
+Your role: Help website visitors understand our services, qualify leads, and schedule conversations with our team.
+
+WHAT WE DO:
+- We deploy "Digital Employees" — AI agents that work alongside human sales partners
+- Our flagship product is Clawbot, an autonomous outbound sales agent that researches prospects, drafts personalized messages, and handles multi-channel outreach (SMS + email)
+- We serve B2B companies looking to scale their go-to-market without hiring large SDR teams
+
+OUR THREE SERVICE MODULES:
+1. Digital SDR — AI-powered outbound prospecting, lead qualification, meeting scheduling. Integrates with CRM. Deploys in days.
+2. Digital Support — AI ticket routing, response drafting, escalation management. Prebuilt helpdesk integrations.
+3. Knowledge Ops — Automated document search, drafting, internal knowledge management with continuous refresh.
+
+PRICING:
+- Hybrid model: base "AI Salary" + performance-based billing
+- This aligns our incentives with client outcomes
+- Custom quotes based on volume and use case
+
+WHAT IS A DIGITAL EMPLOYEE:
+- A Digital Employee is an AI agent that performs real business tasks autonomously — like an SDR who never sleeps
+- It researches prospects, writes personalized outreach, follows up, and escalates hot leads to human partners
+- No setup required from the client — we deploy, configure, and manage everything
+- The AI is always labeled as AI (full compliance and transparency)
+
+COMPLIANCE & SECURITY:
+- Every AI surface is explicitly labeled as AI
+- Strict compliance posture with audit trails
+- Data handling policies and SOC 2 readiness
+- TCPA/CTIA compliant for SMS outreach
+
+CONVERSATION RULES:
+- Be concise (2-4 sentences per response)
+- Be warm, professional, and confident
+- Answer the visitor's actual question — don't redirect them
+- If they ask what something is, explain it clearly
+- Naturally guide toward scheduling a call or sharing their use case
+- Never say "I don't know" — reframe around what we can help with
+- If they share their name, email, or company, acknowledge it warmly`;
+
+app.post("/api/chat", async (req, res) => {
   const { message, leadId } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
@@ -130,7 +170,6 @@ app.post("/api/chat", (req, res) => {
   // Try to extract lead info from message
   const nameMatch = message.match(/(?:my name is|i'm|i am)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
   const emailMatch = message.match(/[\w.-]+@[\w.-]+\.\w+/);
-  // Match company name but stop before common sentence continuations
   const companyMatch = message.match(/(?:from|at|work at|company is)\s+([A-Za-z0-9 &]+?)(?:\.|,|$|\s+(?:and|pain|my|our|we|i))/i);
 
   if (!currentLeadId && (nameMatch || emailMatch)) {
@@ -146,8 +185,29 @@ app.post("/api/chat", (req, res) => {
   const userMsgId = uuid();
   db.prepare("INSERT INTO messages (id, lead_id, role, text) VALUES (?, ?, 'user', ?)").run(userMsgId, currentLeadId, message);
 
-  // Generate contextual reply
-  const reply = generateReply(message);
+  // Build conversation history for context (last 10 messages)
+  let conversationHistory = [];
+  if (currentLeadId) {
+    const priorMessages = db.prepare(
+      "SELECT role, text FROM messages WHERE lead_id = ? ORDER BY created_at DESC LIMIT 10"
+    ).all(currentLeadId);
+    conversationHistory = priorMessages.reverse().map(m => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text,
+    }));
+  } else {
+    conversationHistory = [{ role: "user", content: message }];
+  }
+
+  // Generate AI-powered reply via Cloudflare Workers AI
+  let reply;
+  try {
+    reply = await generateAIReply(conversationHistory);
+  } catch (err) {
+    console.error("[CHAT] AI reply failed, using fallback:", err.message);
+    reply = generateReply(message); // Fall back to keyword matcher
+  }
+
   const replyId = uuid();
   db.prepare("INSERT INTO messages (id, lead_id, role, text) VALUES (?, ?, 'assistant', ?)").run(replyId, currentLeadId, reply);
 
@@ -164,6 +224,52 @@ app.post("/api/chat", (req, res) => {
     toolCall: null,
   });
 });
+
+/**
+ * Call Cloudflare Workers AI (Llama 3.1 8B) for intelligent chat responses.
+ * Falls back to keyword matcher if CF credentials are not configured.
+ */
+async function generateAIReply(conversationHistory) {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !apiToken) {
+    throw new Error("CF_ACCOUNT_ID or CF_API_TOKEN not configured");
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: CHAT_SYSTEM_PROMPT },
+          ...conversationHistory,
+        ],
+        max_tokens: 200,
+        temperature: 0.4,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cloudflare AI API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const aiReply = data?.result?.response;
+
+  if (!aiReply) {
+    throw new Error("No response from Cloudflare AI");
+  }
+
+  return aiReply.trim();
+}
 
 // ─── Activities ──────────────────────────────────────────────
 
