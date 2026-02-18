@@ -231,15 +231,18 @@ app.post("/api/chat", async (req, res) => {
     conversationHistory = [{ role: "user", content: message }];
   }
 
-  // Select system prompt based on intent
-  const systemPrompt = intent === "apply_deal_architect"
-    ? RECRUIT_SYSTEM_PROMPT
-    : CHAT_SYSTEM_PROMPT;
+  // Select system prompt and model based on intent
+  const isRecruit = intent === "apply_deal_architect";
+  const systemPrompt = isRecruit ? RECRUIT_SYSTEM_PROMPT : CHAT_SYSTEM_PROMPT;
+  // Use 70B for recruitment interviews (better state tracking), 8B for general chat (lower cost)
+  const model = isRecruit
+    ? "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    : "@cf/meta/llama-3.1-8b-instruct";
 
   // Generate AI-powered reply via Cloudflare Workers AI
   let reply;
   try {
-    reply = await generateAIReply(conversationHistory, systemPrompt);
+    reply = await generateAIReply(conversationHistory, systemPrompt, model);
   } catch (err) {
     console.error("[CHAT] AI reply failed, using fallback:", err.message);
     reply = intent === "apply_deal_architect"
@@ -268,7 +271,7 @@ app.post("/api/chat", async (req, res) => {
  * Call Cloudflare Workers AI (Llama 3.1 8B) for intelligent chat responses.
  * Falls back to keyword matcher if CF credentials are not configured.
  */
-async function generateAIReply(conversationHistory, systemPrompt = CHAT_SYSTEM_PROMPT) {
+async function generateAIReply(conversationHistory, systemPrompt = CHAT_SYSTEM_PROMPT, model = "@cf/meta/llama-3.1-8b-instruct") {
   const accountId = process.env.CF_ACCOUNT_ID;
   const apiToken = process.env.CF_API_TOKEN;
 
@@ -277,7 +280,7 @@ async function generateAIReply(conversationHistory, systemPrompt = CHAT_SYSTEM_P
   }
 
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
     {
       method: "POST",
       headers: {
@@ -289,7 +292,7 @@ async function generateAIReply(conversationHistory, systemPrompt = CHAT_SYSTEM_P
           { role: "system", content: systemPrompt },
           ...conversationHistory,
         ],
-        max_tokens: 200,
+        max_tokens: 300,
         temperature: 0.4,
       }),
     }
