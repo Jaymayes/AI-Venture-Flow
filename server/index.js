@@ -161,8 +161,40 @@ CONVERSATION RULES:
 - Never say "I don't know" — reframe around what we can help with
 - If they share their name, email, or company, acknowledge it warmly`;
 
+const RECRUIT_SYSTEM_PROMPT = `You are the recruitment interviewer for Referral Service LLC, an AI-Human Hybrid venture studio.
+
+You are screening candidates for the "Deal Architect" role — a fractional CRO / senior sales closer who partners with our AI (Clawbot) to close enterprise deals. This is a 1099 partnership, not W-2 employment.
+
+THE ROLE:
+- Deal Architects are experienced enterprise closers who receive AI-sourced, AI-qualified, AI-briefed opportunities
+- Clawbot handles prospecting, outreach, follow-up, and research — the Deal Architect handles the human relationship and closing
+- Compensation: base retainer + performance bonus on closed revenue
+- This is for senior sales professionals who want to close more deals without doing their own prospecting
+
+YOUR INTERVIEW FLOW:
+Ask these questions one at a time, in order. Wait for the candidate's answer before moving to the next question.
+
+1. "What is your average deal size, and what industry do you primarily sell into?" (already asked in greeting)
+2. "How many years of enterprise closing experience do you have? Have you carried a quota above $500K?"
+3. "Are you comfortable working as a 1099 independent contractor with performance-based compensation?"
+4. "Tell me about your most complex deal — what made it challenging, and how did you close it?"
+5. "Are you currently employed, or available to start within the next 2 weeks?"
+
+AFTER ALL 5 QUESTIONS:
+Thank them warmly and say: "Great answers. I'm going to pass your profile to our CEO, Jamarr Mayes, for a final conversation. You'll hear from us within 48 hours. In the meantime, feel free to ask me anything about the role or Referral Service."
+
+CONVERSATION RULES:
+- Be warm, professional, and concise (2-3 sentences per response)
+- Acknowledge each answer before asking the next question
+- If the candidate asks about the role, comp, or company, answer clearly using the info above
+- Do NOT ask multiple questions at once — one question per message
+- Do NOT act as a customer service agent — you are interviewing them
+- If they give a short or vague answer, gently probe deeper before moving on
+- Track which question you're on based on conversation history`;
+
+
 app.post("/api/chat", async (req, res) => {
-  const { message, leadId } = req.body;
+  const { message, leadId, intent } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
   let currentLeadId = leadId;
@@ -199,13 +231,20 @@ app.post("/api/chat", async (req, res) => {
     conversationHistory = [{ role: "user", content: message }];
   }
 
+  // Select system prompt based on intent
+  const systemPrompt = intent === "apply_deal_architect"
+    ? RECRUIT_SYSTEM_PROMPT
+    : CHAT_SYSTEM_PROMPT;
+
   // Generate AI-powered reply via Cloudflare Workers AI
   let reply;
   try {
-    reply = await generateAIReply(conversationHistory);
+    reply = await generateAIReply(conversationHistory, systemPrompt);
   } catch (err) {
     console.error("[CHAT] AI reply failed, using fallback:", err.message);
-    reply = generateReply(message); // Fall back to keyword matcher
+    reply = intent === "apply_deal_architect"
+      ? "Thanks for your interest in the Deal Architect role! I'm having a brief technical issue. Please try again in a moment, or email careers@referralservice.llc to continue your application."
+      : generateReply(message); // Fall back to keyword matcher
   }
 
   const replyId = uuid();
@@ -229,7 +268,7 @@ app.post("/api/chat", async (req, res) => {
  * Call Cloudflare Workers AI (Llama 3.1 8B) for intelligent chat responses.
  * Falls back to keyword matcher if CF credentials are not configured.
  */
-async function generateAIReply(conversationHistory) {
+async function generateAIReply(conversationHistory, systemPrompt = CHAT_SYSTEM_PROMPT) {
   const accountId = process.env.CF_ACCOUNT_ID;
   const apiToken = process.env.CF_API_TOKEN;
 
@@ -247,7 +286,7 @@ async function generateAIReply(conversationHistory) {
       },
       body: JSON.stringify({
         messages: [
-          { role: "system", content: CHAT_SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           ...conversationHistory,
         ],
         max_tokens: 200,

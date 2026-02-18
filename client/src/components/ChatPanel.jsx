@@ -21,6 +21,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [leadId, setLeadId] = useState(null);
+  const [intent, setIntent] = useState(null);
   const scrollRef = useRef(null);
 
   // ── Auto-scroll on new messages ──
@@ -32,14 +33,15 @@ export default function ChatPanel() {
 
   // ── Custom event listener: allows external components to open chat ──
   const handleOpenChat = useCallback((e) => {
-    const intent = e.detail?.intent;
+    const chatIntent = e.detail?.intent;
 
     setOpen(true);
 
-    if (intent === "apply_deal_architect") {
+    if (chatIntent === "apply_deal_architect") {
       // Reset conversation with Deal Architect interview flow
       setMessages([DEAL_ARCHITECT_GREETING]);
       setLeadId(null);
+      setIntent("apply_deal_architect");
     }
   }, []);
 
@@ -61,6 +63,7 @@ export default function ChatPanel() {
       const data = await apiFetch("POST", "/api/chat", {
         message: text,
         leadId,
+        intent,
       });
       if (data.leadId) setLeadId(data.leadId);
       setMessages((prev) => [
