@@ -13,6 +13,7 @@ import Disclaimer from "./pages/Disclaimer";
 import Accessibility from "./pages/Accessibility";
 import AcceptableUse from "./pages/AcceptableUse";
 import Playbook from "./pages/Playbook";
+import Disbursements from "./pages/Disbursements";
 import AuthGate from "./components/AuthGate";
 import SPGate from "./components/SPGate";
 import ChatPanel from "./components/ChatPanel";
@@ -51,6 +52,9 @@ export default function App() {
           </Route>
           <Route path="/playbook">
             <SPProtectedRoute component={Playbook} />
+          </Route>
+          <Route path="/disbursements">
+            <ProtectedRoute component={Disbursements} />
           </Route>
           <Route path="/recruit" component={Recruit} />
           <Route path="/outreach" component={Outreach} />

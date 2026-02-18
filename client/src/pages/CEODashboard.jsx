@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import Briefings from "./Briefings";
 import RecruitmentOps from "./RecruitmentOps";
+import { DisbursementsContent } from "./Disbursements";
 import {
   ArrowLeft,
   Activity,
@@ -21,6 +22,7 @@ import {
   FileText,
   Users,
   Lock,
+  Banknote,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -261,6 +263,7 @@ const ceoTabs = [
   { id: "dashboard", label: "Dashboard", icon: Activity, color: "emerald" },
   { id: "briefings", label: "Lead Briefings", icon: FileText, color: "cyan" },
   { id: "recruiting", label: "Recruitment Ops", icon: Users, color: "violet" },
+  { id: "disbursements", label: "Disbursements", icon: Banknote, color: "amber" },
 ];
 
 const colorMap = {
@@ -278,6 +281,11 @@ const colorMap = {
     active: "border-violet-400 text-violet-400 bg-violet-400/10",
     idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
     icon: "text-violet-400",
+  },
+  amber: {
+    active: "border-amber-400 text-amber-400 bg-amber-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-amber-400",
   },
 };
 
@@ -381,6 +389,7 @@ export default function CEODashboard() {
       {/* ── Tab Content ── */}
       {activeTab === "briefings" && <Briefings />}
       {activeTab === "recruiting" && <RecruitmentOps />}
+      {activeTab === "disbursements" && <DisbursementsContent />}
 
       {activeTab === "dashboard" && (
       loading && !metrics ? (
