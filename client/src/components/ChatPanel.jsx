@@ -3,26 +3,41 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
-/** Convert URLs in text to clickable <a> tags, preserving the rest as text */
+/** Convert URLs in text to clickable links or CTA buttons */
 function renderMessageContent(text) {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const parts = text.split(urlRegex);
-  return parts.map((part, i) =>
-    urlRegex.test(part) ? (
-      <a
-        key={i}
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline font-medium hover:opacity-80"
-        style={{ wordBreak: "break-all" }}
-      >
-        {part}
-      </a>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  );
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) => {
+    if (/^https?:\/\//.test(part)) {
+      // Calendly links get a styled CTA button
+      if (part.includes("calendly.com")) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block rounded-lg bg-gradient-to-r from-primary to-accent px-4 py-2 text-center text-sm font-semibold text-black no-underline shadow-md transition hover:scale-105 hover:opacity-90"
+          >
+            Schedule Your Call with Jamarr →
+          </a>
+        );
+      }
+      // Other URLs get a simple clickable link
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline font-medium hover:opacity-80"
+          style={{ wordBreak: "break-all" }}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
 
 const WELCOME = {
