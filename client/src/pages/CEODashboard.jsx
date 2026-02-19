@@ -325,6 +325,7 @@ export default function CEODashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [compressionData, setCompressionData] = useState(MOCK_COMPRESSION);
 
   const fetchMetrics = async () => {
     try {
@@ -341,10 +342,38 @@ export default function CEODashboard() {
     }
   };
 
+  const fetchCompression = async () => {
+    try {
+      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
+      const res = await fetch(
+        "https://moltbot-triage-engine.jamarr.workers.dev/api/finops/compression-roi",
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      // Map backend fields to the shape the widget expects
+      setCompressionData({
+        actionableTokenRatio: data.actionableTokenRatio ?? compressionData.actionableTokenRatio,
+        atrTarget: data.actionableTokenRatioTarget ?? compressionData.atrTarget,
+        phantomTokens24h: data.phantomTokensStripped24h ?? compressionData.phantomTokens24h,
+        phantomTokens7d: data.phantomTokensStripped7d ?? compressionData.phantomTokens7d,
+        inferenceRate: 0.00000015,
+        defendedCapital24h: data.defendedCapitalUSD24h ?? compressionData.defendedCapital24h,
+        defendedCapital7d: data.defendedCapitalUSD7d ?? compressionData.defendedCapital7d,
+        compressionPasses: data.compressionPasses ?? compressionData.compressionPasses,
+        passBreakdown: data.passBreakdown ?? compressionData.passBreakdown,
+      });
+    } catch {
+      // Keep mock data on failure
+    }
+  };
+
   useEffect(() => {
     fetchMetrics();
+    fetchCompression();
     const id = setInterval(fetchMetrics, POLL_INTERVAL);
-    return () => clearInterval(id);
+    const id2 = setInterval(fetchCompression, POLL_INTERVAL);
+    return () => { clearInterval(id); clearInterval(id2); };
   }, []);
 
   const m = metrics ?? {};
@@ -575,11 +604,11 @@ export default function CEODashboard() {
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs text-white/40">Actionable Token Ratio (ATR)</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget
+                compressionData.actionableTokenRatio >= compressionData.atrTarget
                   ? "bg-emerald-500/20 text-emerald-400"
                   : "bg-amber-500/20 text-amber-400"
               }`}>
-                {MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget ? "Target Met" : "Below Target"}
+                {compressionData.actionableTokenRatio >= compressionData.atrTarget ? "Target Met" : "Below Target"}
               </span>
             </div>
 
@@ -608,24 +637,24 @@ export default function CEODashboard() {
                 <path
                   d="M 15 85 A 65 65 0 0 1 145 85"
                   fill="none"
-                  stroke={MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget ? "#00e5a0" : "#f59e0b"}
+                  stroke={compressionData.actionableTokenRatio >= compressionData.atrTarget ? "#00e5a0" : "#f59e0b"}
                   strokeWidth="10"
                   strokeLinecap="round"
-                  strokeDasharray={`${MOCK_COMPRESSION.actionableTokenRatio * 204} 204`}
+                  strokeDasharray={`${compressionData.actionableTokenRatio * 204} 204`}
                 />
                 {/* Center text */}
                 <text x="80" y="70" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold" fontFamily="monospace">
-                  {(MOCK_COMPRESSION.actionableTokenRatio * 100).toFixed(0)}%
+                  {(compressionData.actionableTokenRatio * 100).toFixed(0)}%
                 </text>
                 <text x="80" y="86" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="10">
-                  Target: {(MOCK_COMPRESSION.atrTarget * 100).toFixed(0)}%
+                  Target: {(compressionData.atrTarget * 100).toFixed(0)}%
                 </text>
               </svg>
             </div>
 
             {/* Pass Breakdown */}
             <div className="space-y-1.5 mt-2">
-              {Object.entries(MOCK_COMPRESSION.passBreakdown).map(([pass, ratio]) => {
+              {Object.entries(compressionData.passBreakdown).map(([pass, ratio]) => {
                 const passLabels = {
                   filler_removal: "Filler Removal",
                   redundant_history: "Redundant History",
@@ -660,14 +689,14 @@ export default function CEODashboard() {
                 <div>
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Last 24 Hours</p>
                   <p className="text-3xl font-bold text-violet-400">
-                    {MOCK_COMPRESSION.phantomTokens24h.toLocaleString()}
+                    {compressionData.phantomTokens24h.toLocaleString()}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">tokens eliminated</p>
                 </div>
                 <div className="border-t border-white/5 pt-4">
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Last 7 Days</p>
                   <p className="text-2xl font-bold text-violet-300">
-                    {MOCK_COMPRESSION.phantomTokens7d.toLocaleString()}
+                    {compressionData.phantomTokens7d.toLocaleString()}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">tokens eliminated</p>
                 </div>
@@ -675,7 +704,7 @@ export default function CEODashboard() {
             </div>
             <div className="mt-4 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
               <p className="text-violet-400 text-[10px] font-bold uppercase tracking-wider">
-                5-Pass Engine &middot; {MOCK_COMPRESSION.compressionPasses} passes active
+                5-Pass Engine &middot; {compressionData.compressionPasses} passes active
               </p>
             </div>
           </motion.div>
@@ -691,19 +720,19 @@ export default function CEODashboard() {
                 <div>
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Saved (24h)</p>
                   <p className="text-3xl font-bold text-accent">
-                    ${MOCK_COMPRESSION.defendedCapital24h.toFixed(2)}
+                    ${compressionData.defendedCapital24h.toFixed(2)}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">
-                    {MOCK_COMPRESSION.phantomTokens24h.toLocaleString()} tokens &times; ${(MOCK_COMPRESSION.inferenceRate * 1000000).toFixed(2)}/M
+                    {compressionData.phantomTokens24h.toLocaleString()} tokens &times; ${(compressionData.inferenceRate * 1000000).toFixed(2)}/M
                   </p>
                 </div>
                 <div className="border-t border-white/5 pt-4">
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Saved (7d)</p>
                   <p className="text-2xl font-bold text-emerald-300">
-                    ${MOCK_COMPRESSION.defendedCapital7d.toFixed(2)}
+                    ${compressionData.defendedCapital7d.toFixed(2)}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">
-                    {MOCK_COMPRESSION.phantomTokens7d.toLocaleString()} tokens &times; ${(MOCK_COMPRESSION.inferenceRate * 1000000).toFixed(2)}/M
+                    {compressionData.phantomTokens7d.toLocaleString()} tokens &times; ${(compressionData.inferenceRate * 1000000).toFixed(2)}/M
                   </p>
                 </div>
               </div>

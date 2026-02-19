@@ -28,7 +28,7 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 15_000; // Faster poll for security
 
@@ -302,17 +302,38 @@ export function SecOpsLedgerContent() {
     try {
       const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const [feedRes, liabilityRes] = await Promise.all([
-        fetch(`${API_BASE}/security/threat-feed`, { headers }),
-        fetch(`${API_BASE}/security/liability-index`, { headers }),
-      ]);
-      const feedData = await feedRes.json();
-      const liabilityData = await liabilityRes.json();
-      if (feedData.scans) setThreatFeed(feedData.scans);
-      if (liabilityData.sps) setLiability(liabilityData.sps);
+      const res = await fetch(`${API_BASE}/secops/threat-feed`, { headers });
+      const data = await res.json();
+      // Backend returns { liveIntercepts, spLiabilityIndex, quarantineQueue, stats }
+      // Map liveIntercepts to frontend shape
+      const feed = (data.liveIntercepts ?? []).map((e) => ({
+        id: e.eventId,
+        timestamp: e.timestamp,
+        spId: e.spId,
+        spName: e.spName,
+        verdict: e.actionTaken === "QUARANTINED" ? "REVIEW" : e.actionTaken,
+        riskScore: e.riskScore,
+        threatVector: e.threatVector,
+        skillName: e.skillName,
+        deceptionAssessment: e.deceptionAssessment,
+      }));
+      // Map spLiabilityIndex to frontend shape
+      const liabilityData = (data.spLiabilityIndex ?? []).map((sp) => ({
+        spId: sp.spId,
+        spName: sp.spName,
+        blocksThisWeek: sp.flagCount7d,
+        blocksTotal: sp.flagCountTotal,
+        lastBlockAt: sp.lastFlagAt,
+        status: sp.status === "flagged" ? "flagged" : sp.status === "warning" ? "warning" : "clean",
+      }));
+      setThreatFeed(feed);
+      setLiability(liabilityData);
       setLastRefresh(new Date());
     } catch (err) {
-      console.warn("[SecOps] Fetch failed:", err.message);
+      console.warn("[SecOps] Fetch failed, falling back to mock:", err.message);
+      setThreatFeed(MOCK_THREAT_FEED);
+      setLiability(MOCK_SP_LIABILITY);
+      setLastRefresh(new Date());
     } finally {
       setLoading(false);
     }

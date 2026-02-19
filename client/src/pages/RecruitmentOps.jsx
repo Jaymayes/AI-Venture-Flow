@@ -145,6 +145,9 @@ export default function RecruitmentOps() {
   const [pipelineData, setPipelineData] = useState(null);
   const [pipelineLoading, setPipelineLoading] = useState(true);
 
+  // ── SP Efficacy Matrix state (live with mock fallback) ──
+  const [spEfficacy, setSpEfficacy] = useState(MOCK_SP_EFFICACY);
+
   // ── Poll pipeline status every 30s ──
   useEffect(() => {
     let cancelled = false;
@@ -164,12 +167,45 @@ export default function RecruitmentOps() {
       }
     }
 
+    async function fetchEfficacy() {
+      try {
+        const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
+        const res = await fetch(
+          "https://moltbot-triage-engine.jamarr.workers.dev/api/recruitment/sp-efficacy",
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          // Map backend fields to frontend widget shape
+          setSpEfficacy(data.map((sp) => ({
+            spId: sp.spId,
+            spName: sp.spName,
+            totalHandoffs: sp.totalHandoffs,
+            sentimentDeltas: sp.sentimentDeltas ?? [],
+            avgSentimentDelta: sp.postHandoffSentimentDelta ?? 0,
+            emergencyFlags: sp.emergencyFlags,
+            emergencyResolutions: sp.emergencyResolutions,
+            emergencyResolutionRate: sp.emergencyResolutionRate,
+            ceoOverrides: sp.ceoOverrides,
+            ceoOverrideRate: sp.overrideFrequency ?? 0,
+            trend: sp.trend,
+          })));
+        }
+      } catch {
+        // Keep mock data on failure
+      }
+    }
+
     fetchPipeline();
+    fetchEfficacy();
     const interval = setInterval(fetchPipeline, POLL_INTERVAL_MS);
+    const interval2 = setInterval(fetchEfficacy, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearInterval(interval2);
     };
   }, []);
 
@@ -798,7 +834,7 @@ export default function RecruitmentOps() {
 
           {/* SP Efficacy Cards */}
           <div className="grid gap-4 md:grid-cols-2">
-            {MOCK_SP_EFFICACY.map((sp) => {
+            {spEfficacy.map((sp) => {
               const isWarming = sp.trend === "warming";
               const TrendIcon = isWarming ? TrendingUp : TrendingDown;
               const trendColor = isWarming ? "text-emerald-400" : "text-red-400";

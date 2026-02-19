@@ -21,7 +21,7 @@ import { MOCK_DEALS } from "../lib/mock-godmode";
 // Constants
 // ---------------------------------------------------------------------------
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 30_000;
 
@@ -280,14 +280,38 @@ export function RevenueSalvageContent() {
     }
     try {
       const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const res = await fetch(`${API_BASE}/salvage/pipeline`, {
+      const res = await fetch(`${API_BASE}/override/pipeline`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
-      if (data.deals) setDeals(data.deals);
+      // Backend returns { pipeline: { greenZone, amberZone, redZone }, atRiskTcvUSD, totalTcvUSD, sentimentAlerts }
+      // Flatten all zones into a single deals array for the kanban
+      const allDeals = [
+        ...(data.pipeline?.greenZone ?? []),
+        ...(data.pipeline?.amberZone ?? []),
+        ...(data.pipeline?.redZone ?? []),
+      ].map((d) => ({
+        id: d.dealId,
+        prospectName: d.clientName,
+        prospectCompany: d.clientCompany,
+        spName: d.spName,
+        tcv: d.projectedTcv,
+        daysSinceHandoff: d.daysSinceHandoff,
+        stage: d.stage,
+        sentimentScore: d.sentimentScore,
+        sentimentDelta: d.sentimentEmergency?.delta ?? 0,
+        lastContactAt: d.lastContactAt,
+        channel: d.channel,
+        sentimentAlert: d.sentimentEmergency?.active
+          ? d.sentimentEmergency.type
+          : null,
+      }));
+      setDeals(allDeals);
       setLastRefresh(new Date());
     } catch (err) {
-      console.warn("[RevenueSalvage] Fetch failed:", err.message);
+      console.warn("[RevenueSalvage] Fetch failed, falling back to mock:", err.message);
+      setDeals(MOCK_DEALS);
+      setLastRefresh(new Date());
     } finally {
       setLoading(false);
     }
