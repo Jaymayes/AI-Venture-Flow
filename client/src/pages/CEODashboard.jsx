@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Briefings from "./Briefings";
 import RecruitmentOps from "./RecruitmentOps";
 import { DisbursementsContent } from "./Disbursements";
+import { SPOnboardingContent } from "./SPOnboarding";
 import {
   ArrowLeft,
   Activity,
@@ -23,6 +24,7 @@ import {
   Users,
   Lock,
   Banknote,
+  UserPlus,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -264,6 +266,7 @@ const ceoTabs = [
   { id: "briefings", label: "Lead Briefings", icon: FileText, color: "cyan" },
   { id: "recruiting", label: "Recruitment Ops", icon: Users, color: "violet" },
   { id: "disbursements", label: "Disbursements", icon: Banknote, color: "amber" },
+  { id: "sp-onboarding", label: "SP Onboarding", icon: UserPlus, color: "teal" },
 ];
 
 const colorMap = {
@@ -286,6 +289,11 @@ const colorMap = {
     active: "border-amber-400 text-amber-400 bg-amber-400/10",
     idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
     icon: "text-amber-400",
+  },
+  teal: {
+    active: "border-teal-400 text-teal-400 bg-teal-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-teal-400",
   },
 };
 
@@ -390,6 +398,7 @@ export default function CEODashboard() {
       {activeTab === "briefings" && <Briefings />}
       {activeTab === "recruiting" && <RecruitmentOps />}
       {activeTab === "disbursements" && <DisbursementsContent />}
+      {activeTab === "sp-onboarding" && <SPOnboardingContent />}
 
       {activeTab === "dashboard" && (
       loading && !metrics ? (
