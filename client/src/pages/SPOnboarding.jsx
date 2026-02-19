@@ -80,6 +80,11 @@ const gateConfig = {
   billing_active: { label: "Retainer Active", color: "text-emerald-400", bg: "bg-emerald-500/20", icon: CheckCircle2 },
   billing_failed: { label: "Billing Failed", color: "text-red-400", bg: "bg-red-500/20", icon: XCircle },
 
+  // Welcome Email gates
+  welcomeEmail_pending: { label: "Email Pending", color: "text-white/40", bg: "bg-white/5", icon: Clock },
+  welcomeEmail_sent: { label: "Email Sent", color: "text-emerald-400", bg: "bg-emerald-500/20", icon: Mail },
+  welcomeEmail_failed: { label: "Email Failed", color: "text-red-400", bg: "bg-red-500/20", icon: XCircle },
+
   // System Access gates
   system_locked: { label: "Access Locked", color: "text-amber-400", bg: "bg-amber-500/20", icon: Key },
   system_provisioned: { label: "Access Live", color: "text-emerald-400", bg: "bg-emerald-500/20", icon: CheckCircle2 },
@@ -407,11 +412,12 @@ function PipelineRow({ record, onRefresh }) {
         <GateBadge gateKey={`sow_${record.sowStatus}`} />
         <GateBadge gateKey={`connect_${record.connectStatus}`} />
         <GateBadge gateKey={`billing_${record.billingStatus}`} />
+        <GateBadge gateKey={`welcomeEmail_${record.welcomeEmailStatus ?? 'pending'}`} />
         <GateBadge gateKey={`system_${record.systemAccessStatus}`} />
       </div>
 
       {/* Error Details (if any) */}
-      {(record.sowError || record.connectError || record.billingError) && (
+      {(record.sowError || record.connectError || record.billingError || record.welcomeEmailError) && (
         <div className="mt-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
           <div className="flex items-center gap-1.5 mb-1">
             <AlertTriangle size={12} className="text-red-400" />
@@ -426,6 +432,9 @@ function PipelineRow({ record, onRefresh }) {
             )}
             {record.billingError && (
               <p className="text-white/50 text-[11px]"><span className="text-red-400">Billing:</span> {record.billingError}</p>
+            )}
+            {record.welcomeEmailError && (
+              <p className="text-white/50 text-[11px]"><span className="text-red-400">Email:</span> {record.welcomeEmailError}</p>
             )}
           </div>
         </div>
