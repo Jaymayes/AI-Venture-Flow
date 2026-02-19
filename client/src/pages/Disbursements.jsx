@@ -17,18 +17,14 @@ import {
   UserCheck,
   Lock,
 } from "lucide-react";
-import { MOCK_COMMISSIONS } from "../lib/mock-disbursements";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants — live endpoints only, no mock fallback
 // ---------------------------------------------------------------------------
 
 const DISBURSEMENT_API =
   "https://moltbot-triage-engine.jamarr.workers.dev/api/disbursement";
 const POLL_INTERVAL = 30_000;
-
-// Use mock data until live Stripe Connect accounts exist
-const USE_MOCK = true;
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -80,28 +76,25 @@ const w9Config = {
 // ---------------------------------------------------------------------------
 
 async function fetchDashboardLedger() {
-  if (USE_MOCK) {
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 400));
-    return { timestamp: new Date().toISOString(), ...MOCK_COMMISSIONS };
-  }
-
+  const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
   const res = await fetch(`${DISBURSEMENT_API}/dashboard`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
 
 async function executeCEOApproval(commissionId) {
-  if (USE_MOCK) {
-    await new Promise((r) => setTimeout(r, 800));
-    return { success: true, transferId: `tr_mock_${Date.now()}`, amountUSD: 0 };
-  }
-
+  const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
   const res = await fetch(`${DISBURSEMENT_API}/approve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ commissionId }),
   });
   if (!res.ok) {
@@ -323,6 +316,19 @@ function useDisbursementState() {
       setLastUpdated(new Date());
     } catch (err) {
       setError(err.message);
+      // Enforce absolute zero-state — no mock padding
+      setData({
+        pendingApproval: [],
+        blocked: [],
+        recentlyDisbursed: [],
+        totals: {
+          pendingAmountUSD: 0,
+          pendingCount: 0,
+          blockedCount: 0,
+          disbursedAmountLast30Days: 0,
+          disbursedLast30Days: 0,
+        },
+      });
     } finally {
       setLoading(false);
     }

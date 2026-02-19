@@ -162,7 +162,10 @@ export default function RecruitmentOps() {
         }
       } catch (err) {
         console.warn("[RecruitmentOps] Pipeline poll failed:", err.message);
-        if (!cancelled) setPipelineLoading(false);
+        if (!cancelled) {
+          setPipelineData({ summary: { total: 0, enqueued: 0, processing: 0, dispatched: 0, halted: 0, failed: 0 }, prospects: [] });
+          setPipelineLoading(false);
+        }
       }
     }
 
