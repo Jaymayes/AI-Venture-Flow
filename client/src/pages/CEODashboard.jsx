@@ -5,6 +5,9 @@ import Briefings from "./Briefings";
 import RecruitmentOps from "./RecruitmentOps";
 import { DisbursementsContent } from "./Disbursements";
 import { SPOnboardingContent } from "./SPOnboarding";
+import { RevenueSalvageContent } from "./RevenueSalvage";
+import { SecOpsLedgerContent } from "./SecOpsLedger";
+import { MOCK_COMPRESSION } from "../lib/mock-godmode";
 import {
   ArrowLeft,
   Activity,
@@ -25,6 +28,9 @@ import {
   Lock,
   Banknote,
   UserPlus,
+  Flame,
+  Ghost,
+  Sparkles,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -267,6 +273,8 @@ const ceoTabs = [
   { id: "recruiting", label: "Recruitment Ops", icon: Users, color: "violet" },
   { id: "disbursements", label: "Disbursements", icon: Banknote, color: "amber" },
   { id: "sp-onboarding", label: "SP Onboarding", icon: UserPlus, color: "teal" },
+  { id: "revenue-salvage", label: "Revenue Salvage", icon: Flame, color: "red" },
+  { id: "secops", label: "SecOps Ledger", icon: ShieldAlert, color: "rose" },
 ];
 
 const colorMap = {
@@ -294,6 +302,16 @@ const colorMap = {
     active: "border-teal-400 text-teal-400 bg-teal-400/10",
     idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
     icon: "text-teal-400",
+  },
+  red: {
+    active: "border-red-400 text-red-400 bg-red-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-red-400",
+  },
+  rose: {
+    active: "border-rose-400 text-rose-400 bg-rose-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-rose-400",
   },
 };
 
@@ -399,6 +417,8 @@ export default function CEODashboard() {
       {activeTab === "recruiting" && <RecruitmentOps />}
       {activeTab === "disbursements" && <DisbursementsContent />}
       {activeTab === "sp-onboarding" && <SPOnboardingContent />}
+      {activeTab === "revenue-salvage" && <RevenueSalvageContent />}
+      {activeTab === "secops" && <SecOpsLedgerContent />}
 
       {activeTab === "dashboard" && (
       loading && !metrics ? (
@@ -533,6 +553,167 @@ export default function CEODashboard() {
             icon={Activity}
             iconColor="text-accent"
           />
+        </motion.div>
+
+        {/* ================================================================ */}
+        {/* MODULE 1.5: Compression ROI Telemetry (P3 Engine)               */}
+        {/* ================================================================ */}
+        <Section
+          icon={Sparkles}
+          title="Compression ROI Telemetry"
+          subtitle="P3 Token Compression — Defending the 0.80 gross margin floor"
+        />
+
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={stagger}
+          className="grid grid-cols-1 gap-4 lg:grid-cols-3"
+        >
+          {/* ATR Gauge */}
+          <motion.div variants={fadeUp} className="glass noise overflow-hidden rounded-2xl p-5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs text-white/40">Actionable Token Ratio (ATR)</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-amber-500/20 text-amber-400"
+              }`}>
+                {MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget ? "Target Met" : "Below Target"}
+              </span>
+            </div>
+
+            {/* ATR Speedometer SVG */}
+            <div className="flex justify-center py-4">
+              <svg width="160" height="90" viewBox="0 0 160 90">
+                {/* Background arc */}
+                <path
+                  d="M 15 85 A 65 65 0 0 1 145 85"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.06)"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                />
+                {/* Target zone (>=0.70) */}
+                <path
+                  d="M 15 85 A 65 65 0 0 1 145 85"
+                  fill="none"
+                  stroke="rgba(0,229,160,0.1)"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${0.30 * 204} 204`}
+                  strokeDashoffset={`-${0.70 * 204}`}
+                />
+                {/* Current value arc */}
+                <path
+                  d="M 15 85 A 65 65 0 0 1 145 85"
+                  fill="none"
+                  stroke={MOCK_COMPRESSION.actionableTokenRatio >= MOCK_COMPRESSION.atrTarget ? "#00e5a0" : "#f59e0b"}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${MOCK_COMPRESSION.actionableTokenRatio * 204} 204`}
+                />
+                {/* Center text */}
+                <text x="80" y="70" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold" fontFamily="monospace">
+                  {(MOCK_COMPRESSION.actionableTokenRatio * 100).toFixed(0)}%
+                </text>
+                <text x="80" y="86" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="10">
+                  Target: {(MOCK_COMPRESSION.atrTarget * 100).toFixed(0)}%
+                </text>
+              </svg>
+            </div>
+
+            {/* Pass Breakdown */}
+            <div className="space-y-1.5 mt-2">
+              {Object.entries(MOCK_COMPRESSION.passBreakdown).map(([pass, ratio]) => {
+                const passLabels = {
+                  filler_removal: "Filler Removal",
+                  redundant_history: "Redundant History",
+                  boilerplate_collapse: "Boilerplate Collapse",
+                  semantic_dedup: "Semantic Dedup",
+                  context_pruning: "Context Pruning",
+                };
+                return (
+                  <div key={pass} className="flex items-center gap-2">
+                    <span className="text-[10px] text-white/40 w-28 truncate">{passLabels[pass] ?? pass}</span>
+                    <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                        style={{ width: `${ratio * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-white/50 w-8 text-right">{(ratio * 100).toFixed(0)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Phantom Tokens Counter */}
+          <motion.div variants={fadeUp} className="glass noise overflow-hidden rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Ghost size={16} className="text-violet-400" />
+                <span className="text-xs text-white/40">Phantom Tokens Stripped</span>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Last 24 Hours</p>
+                  <p className="text-3xl font-bold text-violet-400">
+                    {MOCK_COMPRESSION.phantomTokens24h.toLocaleString()}
+                  </p>
+                  <p className="text-white/20 text-[10px] mt-0.5">tokens eliminated</p>
+                </div>
+                <div className="border-t border-white/5 pt-4">
+                  <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Last 7 Days</p>
+                  <p className="text-2xl font-bold text-violet-300">
+                    {MOCK_COMPRESSION.phantomTokens7d.toLocaleString()}
+                  </p>
+                  <p className="text-white/20 text-[10px] mt-0.5">tokens eliminated</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+              <p className="text-violet-400 text-[10px] font-bold uppercase tracking-wider">
+                5-Pass Engine &middot; {MOCK_COMPRESSION.compressionPasses} passes active
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Defended Capital */}
+          <motion.div variants={fadeUp} className="glass noise overflow-hidden rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign size={16} className="text-accent" />
+                <span className="text-xs text-white/40">Defended Capital</span>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Saved (24h)</p>
+                  <p className="text-3xl font-bold text-accent">
+                    ${MOCK_COMPRESSION.defendedCapital24h.toFixed(2)}
+                  </p>
+                  <p className="text-white/20 text-[10px] mt-0.5">
+                    {MOCK_COMPRESSION.phantomTokens24h.toLocaleString()} tokens &times; ${(MOCK_COMPRESSION.inferenceRate * 1000000).toFixed(2)}/M
+                  </p>
+                </div>
+                <div className="border-t border-white/5 pt-4">
+                  <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Saved (7d)</p>
+                  <p className="text-2xl font-bold text-emerald-300">
+                    ${MOCK_COMPRESSION.defendedCapital7d.toFixed(2)}
+                  </p>
+                  <p className="text-white/20 text-[10px] mt-0.5">
+                    {MOCK_COMPRESSION.phantomTokens7d.toLocaleString()} tokens &times; ${(MOCK_COMPRESSION.inferenceRate * 1000000).toFixed(2)}/M
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                Margin Floor: 80% &middot; Currently {fmtPct(ue.currentGrossMargin ?? 0)}
+              </p>
+            </div>
+          </motion.div>
         </motion.div>
 
         {/* ================================================================ */}

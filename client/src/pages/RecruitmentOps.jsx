@@ -19,7 +19,13 @@ import {
   FileUp,
   CheckCircle2,
   XCircle,
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  Flame,
+  Shield,
 } from "lucide-react";
+import { MOCK_SP_EFFICACY } from "../lib/mock-godmode";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -771,6 +777,134 @@ export default function RecruitmentOps() {
             </div>
           </motion.div>
         </div>
+
+        {/* ================================================================ */}
+        {/* SP Psychological Efficacy Matrix                                 */}
+        {/* ================================================================ */}
+        <motion.div variants={fadeUp} className="mt-8">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-pink-500/20">
+              <Brain size={20} className="text-rose-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold">
+                SP Psychological <span className="gradient-text">Efficacy Matrix</span>
+              </h2>
+              <p className="text-sm text-white/40">
+                Post-handoff sentiment tracking &middot; Emergency resolution rates
+              </p>
+            </div>
+          </div>
+
+          {/* SP Efficacy Cards */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {MOCK_SP_EFFICACY.map((sp) => {
+              const isWarming = sp.trend === "warming";
+              const TrendIcon = isWarming ? TrendingUp : TrendingDown;
+              const trendColor = isWarming ? "text-emerald-400" : "text-red-400";
+              const trendBg = isWarming ? "bg-emerald-500/20" : "bg-red-500/20";
+              const overrideHighRisk = sp.ceoOverrideRate >= 0.10;
+
+              return (
+                <div
+                  key={sp.spId}
+                  className={`glass noise rounded-2xl p-5 transition border ${
+                    overrideHighRisk ? "border-red-500/30" : "border-white/10"
+                  } hover:border-white/20`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-semibold text-sm">{sp.spName}</span>
+                      <span className="text-white/30 text-xs font-mono">{sp.spId}</span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${trendBg} ${trendColor}`}>
+                      <TrendIcon size={10} />
+                      {sp.trend.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* Sentiment Delta Heatmap (mini sparkline) */}
+                  <div className="mb-4">
+                    <p className="text-white/30 text-[10px] uppercase tracking-wider mb-2">
+                      Post-Handoff Sentiment Delta (&Delta;)
+                    </p>
+                    <div className="flex items-end gap-1 h-8">
+                      {sp.sentimentDeltas.map((delta, i) => {
+                        const height = Math.min(100, Math.abs(delta) * 120 + 10);
+                        const isPos = delta >= 0;
+                        return (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-sm transition-all"
+                            style={{
+                              height: `${height}%`,
+                              background: isPos
+                                ? `rgba(0,229,160,${0.3 + Math.abs(delta)})`
+                                : `rgba(239,68,68,${0.3 + Math.abs(delta)})`,
+                            }}
+                            title={`Handoff ${i + 1}: ${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(0)}%`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[9px] text-white/20">Recent handoffs &rarr;</span>
+                      <span className={`text-xs font-bold ${isWarming ? "text-emerald-400" : "text-red-400"}`}>
+                        Avg &Delta; {sp.avgSentimentDelta >= 0 ? "+" : ""}{(sp.avgSentimentDelta * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metrics Row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Emergency Resolution Rate */}
+                    <div className="text-center p-2 rounded-lg bg-white/5">
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Emergency<br/>Resolution</p>
+                      <p className={`text-lg font-bold ${
+                        sp.emergencyResolutionRate >= 0.80
+                          ? "text-emerald-400"
+                          : sp.emergencyResolutionRate >= 0.50
+                            ? "text-amber-400"
+                            : "text-red-400"
+                      }`}>
+                        {(sp.emergencyResolutionRate * 100).toFixed(0)}%
+                      </p>
+                      <p className="text-[9px] text-white/20">
+                        {sp.emergencyResolutions}/{sp.emergencyFlags} saved
+                      </p>
+                    </div>
+
+                    {/* CEO Override Frequency */}
+                    <div className={`text-center p-2 rounded-lg ${overrideHighRisk ? "bg-red-500/10" : "bg-white/5"}`}>
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">CEO<br/>Override</p>
+                      <p className={`text-lg font-bold ${overrideHighRisk ? "text-red-400" : "text-white/60"}`}>
+                        {(sp.ceoOverrideRate * 100).toFixed(0)}%
+                      </p>
+                      <p className="text-[9px] text-white/20">
+                        {sp.ceoOverrides}/{sp.totalHandoffs} deals
+                      </p>
+                      {overrideHighRisk && (
+                        <p className="text-[8px] text-red-400 font-bold mt-0.5 animate-pulse">
+                          TERMINATION RISK
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Total Handoffs */}
+                    <div className="text-center p-2 rounded-lg bg-white/5">
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Total<br/>Handoffs</p>
+                      <p className="text-lg font-bold text-white/70">
+                        {sp.totalHandoffs}
+                      </p>
+                      <p className="text-[9px] text-white/20">lifetime</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );
