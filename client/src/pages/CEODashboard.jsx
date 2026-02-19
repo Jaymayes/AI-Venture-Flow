@@ -7,7 +7,6 @@ import { DisbursementsContent } from "./Disbursements";
 import { SPOnboardingContent } from "./SPOnboarding";
 import { RevenueSalvageContent } from "./RevenueSalvage";
 import { SecOpsLedgerContent } from "./SecOpsLedger";
-import { MOCK_COMPRESSION } from "../lib/mock-godmode";
 import {
   ArrowLeft,
   Activity,
@@ -326,7 +325,17 @@ export default function CEODashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [compressionData, setCompressionData] = useState(MOCK_COMPRESSION);
+  const [compressionData, setCompressionData] = useState({
+    actionableTokenRatio: 0,
+    atrTarget: 0.80,
+    phantomTokens24h: 0,
+    phantomTokens7d: 0,
+    inferenceRate: 0.00000015,
+    defendedCapital24h: 0,
+    defendedCapital7d: 0,
+    compressionPasses: 0,
+    passBreakdown: {},
+  });
 
   const fetchMetrics = async () => {
     try {
@@ -354,18 +363,18 @@ export default function CEODashboard() {
       const data = await res.json();
       // Map backend fields to the shape the widget expects
       setCompressionData({
-        actionableTokenRatio: data.actionableTokenRatio ?? compressionData.actionableTokenRatio,
-        atrTarget: data.actionableTokenRatioTarget ?? compressionData.atrTarget,
-        phantomTokens24h: data.phantomTokensStripped24h ?? compressionData.phantomTokens24h,
-        phantomTokens7d: data.phantomTokensStripped7d ?? compressionData.phantomTokens7d,
+        actionableTokenRatio: data.actionableTokenRatio ?? 0,
+        atrTarget: data.actionableTokenRatioTarget ?? 0.80,
+        phantomTokens24h: data.phantomTokensStripped24h ?? 0,
+        phantomTokens7d: data.phantomTokensStripped7d ?? 0,
         inferenceRate: 0.00000015,
-        defendedCapital24h: data.defendedCapitalUSD24h ?? compressionData.defendedCapital24h,
-        defendedCapital7d: data.defendedCapitalUSD7d ?? compressionData.defendedCapital7d,
-        compressionPasses: data.compressionPasses ?? compressionData.compressionPasses,
-        passBreakdown: data.passBreakdown ?? compressionData.passBreakdown,
+        defendedCapital24h: data.defendedCapitalUSD24h ?? 0,
+        defendedCapital7d: data.defendedCapitalUSD7d ?? 0,
+        compressionPasses: data.compressionPasses ?? 0,
+        passBreakdown: data.passBreakdown ?? {},
       });
     } catch {
-      // Keep mock data on failure
+      // Enforce zeroes on failure — no mock padding
     }
   };
 

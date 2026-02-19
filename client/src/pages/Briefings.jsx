@@ -26,18 +26,10 @@ import {
   Filter,
   Sparkles,
 } from "lucide-react";
-import {
-  MOCK_BOUNCER_STATS,
-  MOCK_ACTIVE_GRAPH,
-  MOCK_TRIAGE_QUEUE,
-  MOCK_INGESTION_FUNNEL,
-} from "../lib/mock-outbound";
 
 // ---------------------------------------------------------------------------
-// Toggle — flip to false once live /api/outbound/* endpoints are wired
+// Live API — no mock fallback. Glass pane over bare metal.
 // ---------------------------------------------------------------------------
-
-const USE_MOCK = true;
 
 const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api/outbound";
 
@@ -551,22 +543,24 @@ function TriageLaunchpad({ queue, onAssign }) {
 // ===========================================================================
 
 export default function Briefings() {
-  const [bouncerStats, setBouncerStats] = useState(MOCK_BOUNCER_STATS);
-  const [activeGraph, setActiveGraph] = useState(MOCK_ACTIVE_GRAPH);
-  const [triageQueue, setTriageQueue] = useState(MOCK_TRIAGE_QUEUE);
-  const [ingestionFunnel, setIngestionFunnel] = useState(MOCK_INGESTION_FUNNEL);
-  const [loading, setLoading] = useState(!USE_MOCK);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [bouncerStats, setBouncerStats] = useState(null);
+  const [activeGraph, setActiveGraph] = useState([]);
+  const [triageQueue, setTriageQueue] = useState([]);
+  const [ingestionFunnel, setIngestionFunnel] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(null);
 
-  // ── Fetch live data (when USE_MOCK is false) ──
+  // ── Fetch live data — no mock fallback ──
   const fetchAll = useCallback(async () => {
-    if (USE_MOCK) return;
     setLoading(true);
     try {
+      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
       const [statsRes, graphRes, triageRes] = await Promise.all([
-        fetch(`${API_BASE}/bouncer-stats`),
-        fetch(`${API_BASE}/active-graph`),
-        fetch(`${API_BASE}/triage-queue`),
+        fetch(`${API_BASE}/bouncer-stats`, { headers }),
+        fetch(`${API_BASE}/active-graph`, { headers }),
+        fetch(`${API_BASE}/triage-queue`, { headers }),
       ]);
 
       if (statsRes.ok) {
@@ -575,16 +569,19 @@ export default function Briefings() {
       }
       if (graphRes.ok) {
         const data = await graphRes.json();
-        setActiveGraph(data.engagements ?? data);
+        setActiveGraph(data.engagements ?? []);
       }
       if (triageRes.ok) {
         const data = await triageRes.json();
-        setTriageQueue(data.queue ?? data);
+        setTriageQueue(data.queue ?? []);
       }
 
       setLastRefresh(new Date());
     } catch (err) {
-      console.error("[ToFu Radar] Fetch error, falling back to mock:", err);
+      console.error("[ToFu Radar] Fetch error:", err);
+      setBouncerStats(null);
+      setActiveGraph([]);
+      setTriageQueue([]);
     } finally {
       setLoading(false);
     }
@@ -592,10 +589,8 @@ export default function Briefings() {
 
   useEffect(() => {
     fetchAll();
-    if (!USE_MOCK) {
-      const interval = setInterval(fetchAll, 30_000);
-      return () => clearInterval(interval);
-    }
+    const interval = setInterval(fetchAll, 30_000);
+    return () => clearInterval(interval);
   }, [fetchAll]);
 
   // ── Assign to SP handler (mock for now) ──
@@ -644,7 +639,7 @@ export default function Briefings() {
       {/* Content */}
       <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
         {/* 1. AI Bouncer Ledger */}
-        <BouncerLedger stats={bouncerStats} funnel={ingestionFunnel} />
+        {bouncerStats && <BouncerLedger stats={bouncerStats} funnel={ingestionFunnel} />}
 
         {/* 2. Engagement State Machine Kanban */}
         <EngagementKanban prospects={activeGraph} />

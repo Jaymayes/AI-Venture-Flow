@@ -25,7 +25,6 @@ import {
   Flame,
   Shield,
 } from "lucide-react";
-import { MOCK_SP_EFFICACY } from "../lib/mock-godmode";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -145,8 +144,8 @@ export default function RecruitmentOps() {
   const [pipelineData, setPipelineData] = useState(null);
   const [pipelineLoading, setPipelineLoading] = useState(true);
 
-  // ── SP Efficacy Matrix state (live with mock fallback) ──
-  const [spEfficacy, setSpEfficacy] = useState(MOCK_SP_EFFICACY);
+  // ── SP Efficacy Matrix state — live only, no mock fallback ──
+  const [spEfficacy, setSpEfficacy] = useState([]);
 
   // ── Poll pipeline status every 30s ──
   useEffect(() => {
@@ -193,7 +192,8 @@ export default function RecruitmentOps() {
           })));
         }
       } catch {
-        // Keep mock data on failure
+        // Enforce empty array on failure — no mock padding
+        setSpEfficacy([]);
       }
     }
 

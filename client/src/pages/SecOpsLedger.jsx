@@ -19,16 +19,10 @@ import {
   UserX,
   Crown,
 } from "lucide-react";
-import {
-  MOCK_THREAT_FEED,
-  MOCK_SP_LIABILITY,
-} from "../lib/mock-godmode";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants — live endpoints only, no mock fallback
 // ---------------------------------------------------------------------------
-
-const USE_MOCK = false;
 const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 15_000; // Faster poll for security
 
@@ -292,20 +286,11 @@ export function SecOpsLedgerContent() {
   const [lastRefresh, setLastRefresh] = useState(null);
 
   const fetchData = useCallback(async () => {
-    if (USE_MOCK) {
-      setThreatFeed(MOCK_THREAT_FEED);
-      setLiability(MOCK_SP_LIABILITY);
-      setLastRefresh(new Date());
-      setLoading(false);
-      return;
-    }
     try {
       const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${API_BASE}/secops/threat-feed`, { headers });
       const data = await res.json();
-      // Backend returns { liveIntercepts, spLiabilityIndex, quarantineQueue, stats }
-      // Map liveIntercepts to frontend shape
       const feed = (data.liveIntercepts ?? []).map((e) => ({
         id: e.eventId,
         timestamp: e.timestamp,
@@ -317,7 +302,6 @@ export function SecOpsLedgerContent() {
         skillName: e.skillName,
         deceptionAssessment: e.deceptionAssessment,
       }));
-      // Map spLiabilityIndex to frontend shape
       const liabilityData = (data.spLiabilityIndex ?? []).map((sp) => ({
         spId: sp.spId,
         spName: sp.spName,
@@ -330,10 +314,9 @@ export function SecOpsLedgerContent() {
       setLiability(liabilityData);
       setLastRefresh(new Date());
     } catch (err) {
-      console.warn("[SecOps] Fetch failed, falling back to mock:", err.message);
-      setThreatFeed(MOCK_THREAT_FEED);
-      setLiability(MOCK_SP_LIABILITY);
-      setLastRefresh(new Date());
+      console.warn("[SecOps] Fetch failed:", err.message);
+      setThreatFeed([]);
+      setLiability([]);
     } finally {
       setLoading(false);
     }

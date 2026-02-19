@@ -15,13 +15,10 @@ import {
   ChevronRight,
   Eye,
 } from "lucide-react";
-import { MOCK_DEALS } from "../lib/mock-godmode";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants — live endpoints only, no mock fallback
 // ---------------------------------------------------------------------------
-
-const USE_MOCK = false;
 const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 30_000;
 
@@ -272,20 +269,12 @@ export function RevenueSalvageContent() {
   const [lastRefresh, setLastRefresh] = useState(null);
 
   const fetchDeals = useCallback(async () => {
-    if (USE_MOCK) {
-      setDeals(MOCK_DEALS);
-      setLastRefresh(new Date());
-      setLoading(false);
-      return;
-    }
     try {
       const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
       const res = await fetch(`${API_BASE}/override/pipeline`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
-      // Backend returns { pipeline: { greenZone, amberZone, redZone }, atRiskTcvUSD, totalTcvUSD, sentimentAlerts }
-      // Flatten all zones into a single deals array for the kanban
       const allDeals = [
         ...(data.pipeline?.greenZone ?? []),
         ...(data.pipeline?.amberZone ?? []),
@@ -309,9 +298,8 @@ export function RevenueSalvageContent() {
       setDeals(allDeals);
       setLastRefresh(new Date());
     } catch (err) {
-      console.warn("[RevenueSalvage] Fetch failed, falling back to mock:", err.message);
-      setDeals(MOCK_DEALS);
-      setLastRefresh(new Date());
+      console.warn("[RevenueSalvage] Fetch failed:", err.message);
+      setDeals([]);
     } finally {
       setLoading(false);
     }
