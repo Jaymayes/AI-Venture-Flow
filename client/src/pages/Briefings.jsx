@@ -1,36 +1,49 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FileText,
-  Phone,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  Zap,
+  Radio,
+  PenTool,
+  CheckCircle,
+  Send,
+  Clock,
+  Mail,
+  Linkedin,
+  ChevronRight,
   Target,
   Brain,
-  MessageSquare,
-  Lightbulb,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight,
-  User,
-  Clock,
   AlertTriangle,
-  CheckCircle,
-  Trophy,
+  Flame,
+  TrendingUp,
+  UserPlus,
+  Eye,
+  Link2,
+  RefreshCw,
+  BarChart3,
+  Filter,
   Sparkles,
-  X,
-  Send,
-  Loader2,
-  BookOpen,
 } from "lucide-react";
+import {
+  MOCK_BOUNCER_STATS,
+  MOCK_ACTIVE_GRAPH,
+  MOCK_TRIAGE_QUEUE,
+  MOCK_INGESTION_FUNNEL,
+} from "../lib/mock-outbound";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Toggle — flip to false once live /api/outbound/* endpoints are wired
 // ---------------------------------------------------------------------------
 
-const BRIEFINGS_URL =
-  "https://moltbot-triage-engine.jamarr.workers.dev/api/briefings";
-const KNOWLEDGE_INGEST_URL =
-  "https://moltbot-triage-engine.jamarr.workers.dev/api/knowledge/ingest";
-const POLL_INTERVAL = 30_000;
+const USE_MOCK = true;
+
+const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api/outbound";
+
+// ---------------------------------------------------------------------------
+// Animation Variants
+// ---------------------------------------------------------------------------
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -42,15 +55,15 @@ const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
 // Helpers
 // ---------------------------------------------------------------------------
 
-const scoreColor = (score) => {
-  if (score >= 91) return { bg: "bg-emerald-500/20", text: "text-emerald-400", dot: "bg-emerald-400", label: "High Intent" };
-  if (score >= 86) return { bg: "bg-amber-500/20", text: "text-amber-400", dot: "bg-amber-400", label: "Elevated" };
-  return { bg: "bg-red-500/20", text: "text-red-400", dot: "bg-red-400", label: "Threshold" };
-};
+const fmt = (n) => (n ?? 0).toLocaleString();
+const fmtUSD = (n) => `$${(n ?? 0).toFixed(2)}`;
+const fmtPct = (n) => `${(n ?? 0).toFixed(1)}%`;
 
 const timeAgo = (iso) => {
+  if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
@@ -58,688 +71,587 @@ const timeAgo = (iso) => {
   return `${days}d ago`;
 };
 
-const formatTimestamp = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+const intentColor = (score) => {
+  if (score >= 85) return { bg: "bg-emerald-500/20", text: "text-emerald-400", dot: "bg-emerald-400", label: "High Intent" };
+  if (score >= 70) return { bg: "bg-amber-500/20", text: "text-amber-400", dot: "bg-amber-400", label: "Warm" };
+  return { bg: "bg-red-500/20", text: "text-red-400", dot: "bg-red-400", label: "Exploratory" };
+};
+
+const sentimentIcon = (label) => {
+  const map = {
+    excited: { emoji: "🔥", color: "text-emerald-400" },
+    curious: { emoji: "🧐", color: "text-cyan-400" },
+    anxious: { emoji: "😰", color: "text-amber-400" },
+    urgent: { emoji: "⚡", color: "text-red-400" },
+    neutral: { emoji: "😐", color: "text-white/50" },
+  };
+  return map[label] ?? map.neutral;
+};
+
+const channelIcon = (ch) => {
+  if (ch === "linkedin") return <Linkedin size={13} className="text-blue-400" />;
+  return <Mail size={13} className="text-cyan-400" />;
 };
 
 // ---------------------------------------------------------------------------
-// Section Accordion
+// Kanban Column Configuration
 // ---------------------------------------------------------------------------
 
-function BriefingSection({ icon: Icon, title, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
+const KANBAN_COLUMNS = [
+  { state: "Signal Analysis", icon: Radio, color: "cyan", bgGlow: "from-cyan-500/10" },
+  { state: "Drafting", icon: PenTool, color: "violet", bgGlow: "from-violet-500/10" },
+  { state: "Quality Gate", icon: CheckCircle, color: "amber", bgGlow: "from-amber-500/10" },
+  { state: "Dispatched", icon: Send, color: "emerald", bgGlow: "from-emerald-500/10" },
+  { state: "Cooldown", icon: Clock, color: "orange", bgGlow: "from-orange-500/10" },
+];
+
+const stateColorMap = {
+  "Signal Analysis": "border-cyan-400/30",
+  Drafting: "border-violet-400/30",
+  "Quality Gate": "border-amber-400/30",
+  Dispatched: "border-emerald-400/30",
+  Cooldown: "border-orange-400/30",
+};
+
+// ===========================================================================
+// 1. AI Bouncer Ledger Widget
+// ===========================================================================
+
+function BouncerLedger({ stats, funnel }) {
+  const rejectedTotal = stats.rejectedDeterministic + stats.rejectedLLM;
 
   return (
-    <div className="glass noise rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-white/5 transition-colors"
-      >
-        <Icon size={18} className="text-cyan-400 shrink-0" />
-        <span className="font-semibold text-white/90 flex-1">{title}</span>
-        {open ? (
-          <ChevronDown size={16} className="text-white/40" />
-        ) : (
-          <ChevronRight size={16} className="text-white/40" />
-        )}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1, transition: { duration: 0.25 } }}
-            exit={{ height: 0, opacity: 0, transition: { duration: 0.2 } }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 text-sm text-white/70 leading-relaxed">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Closed-Won Modal — RAG Flywheel
-// ---------------------------------------------------------------------------
-
-function ClosedWonModal({ briefing, onClose, onSuccess }) {
-  const [summary, setSummary] = useState("");
-  const [tcv, setTcv] = useState("");
-  const [winningArg, setWinningArg] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-
-  const prospectName = briefing?.trigger?.from ?? "Unknown";
-  const industry = briefing?.trigger?.qualificationData ?? "";
-
-  const handleSubmit = async () => {
-    if (!summary.trim() && !winningArg.trim()) {
-      setError("Provide at least a deal summary or winning argument.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    // Build the knowledge document content from the SP's input + briefing context
-    const parts = [];
-    parts.push(`CLOSED-WON DEAL REPORT`);
-    parts.push(`Lead: ${prospectName}`);
-    parts.push(`Intent Score: ${briefing?.trigger?.intentScore ?? "N/A"}/100`);
-    parts.push(`Closed By: Sovereign Professional`);
-    if (tcv.trim()) parts.push(`TCV: ${tcv.trim()}`);
-    parts.push(`Date: ${new Date().toISOString().split("T")[0]}`);
-    parts.push("");
-
-    if (summary.trim()) {
-      parts.push("DEAL SUMMARY:");
-      parts.push(summary.trim());
-      parts.push("");
-    }
-
-    if (winningArg.trim()) {
-      parts.push("WINNING ARGUMENT / WHAT CLOSED THE DEAL:");
-      parts.push(winningArg.trim());
-      parts.push("");
-    }
-
-    // Include the original qualification data as context
-    if (briefing?.qualificationData) {
-      parts.push("ORIGINAL QUALIFICATION DATA:");
-      parts.push(briefing.qualificationData);
-      parts.push("");
-    }
-
-    if (briefing?.recommendedNextSteps) {
-      parts.push("AI-RECOMMENDED STEPS (for training reference):");
-      parts.push(briefing.recommendedNextSteps);
-    }
-
-    const title = `Closed-Won: ${prospectName} — ${new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
-
-    try {
-      const res = await fetch(KNOWLEDGE_INGEST_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          source: "closed-won",
-          content: parts.join("\n"),
-          // Extract industry hint from qualification data
-          ...(industry.toLowerCase().includes("saas") ? { industry: "SaaS" } : {}),
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      setResult(data);
-      if (onSuccess) onSuccess(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-        {/* Modal */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0, transition: { duration: 0.3 } }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative glass noise rounded-2xl p-6 w-full max-w-lg border border-white/10 max-h-[85vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition-colors"
-          >
-            <X size={18} />
-          </button>
-
-          {/* Success state */}
-          {result ? (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                <Sparkles size={28} className="text-emerald-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Knowledge Indexed</h3>
-              <p className="text-white/50 text-sm mb-4">
-                Your deal intelligence has been embedded into the RAG knowledge base.
-                The AI will use this to draft smarter outreach for similar prospects.
-              </p>
-              <div className="glass noise rounded-lg p-3 text-left text-xs text-white/40 space-y-1 mb-4">
-                <p><span className="text-white/60">Document ID:</span> {result.documentId}</p>
-                <p><span className="text-white/60">Chunks created:</span> {result.chunksCreated}</p>
-                <p><span className="text-white/60">Status:</span> <span className="text-emerald-400">{result.status}</span></p>
-              </div>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 rounded-lg bg-white/10 text-white/70 hover:bg-white/15 transition-colors text-sm"
-              >
-                Done
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Header */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                  <Trophy size={20} className="text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Mark as Closed-Won</h3>
-                  <p className="text-white/40 text-xs">Train the AI with your winning strategy</p>
-                </div>
-              </div>
-
-              {/* Lead context */}
-              <div className="glass noise rounded-lg p-3 mb-5 text-xs text-white/50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Phone size={12} />
-                  <span className="text-white/70 font-mono">{prospectName}</span>
-                  <span className="text-white/30">|</span>
-                  <span>Score: {briefing?.trigger?.intentScore}/100</span>
-                </div>
-              </div>
-
-              {/* Form */}
-              <div className="space-y-4">
-                {/* TCV */}
-                <div>
-                  <label className="block text-sm font-semibold text-white/60 mb-1.5">
-                    Total Contract Value (optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. $150,000"
-                    value={tcv}
-                    onChange={(e) => setTcv(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white/90 text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-colors"
-                  />
-                </div>
-
-                {/* Deal Summary */}
-                <div>
-                  <label className="block text-sm font-semibold text-white/60 mb-1.5">
-                    Deal Summary
-                  </label>
-                  <textarea
-                    placeholder="What happened? What were the key moments in the negotiation? What objections did you overcome?"
-                    value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white/90 text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-colors resize-none leading-relaxed"
-                  />
-                </div>
-
-                {/* Winning Argument */}
-                <div>
-                  <label className="block text-sm font-semibold text-white/60 mb-1.5">
-                    Winning Argument / What Closed the Deal
-                  </label>
-                  <textarea
-                    placeholder="What was the single most compelling point? The pain point that resonated? The demo moment that sealed it?"
-                    value={winningArg}
-                    onChange={(e) => setWinningArg(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white/90 text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-colors resize-none leading-relaxed"
-                  />
-                </div>
-
-                {/* Info note */}
-                <div className="flex items-start gap-2 text-white/30 text-xs">
-                  <BookOpen size={14} className="shrink-0 mt-0.5" />
-                  <p>
-                    Your insights will be embedded into the knowledge base. Future AI-drafted
-                    outreach for similar prospects will be grounded in your real deal intelligence.
-                  </p>
-                </div>
-
-                {/* Error */}
-                {error && (
-                  <div className="flex items-center gap-2 text-red-400 text-xs p-2 rounded-lg bg-red-400/5 border border-red-400/10">
-                    <AlertTriangle size={14} />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {/* Submit */}
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-500/80 to-cyan-500/80 text-white font-semibold text-sm hover:from-emerald-500 hover:to-cyan-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Training AI...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} />
-                      Submit &amp; Train AI
-                    </>
-                  )}
-                </button>
-              </div>
-            </>
-          )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Briefing Card (list item)
-// ---------------------------------------------------------------------------
-
-function BriefingCard({ briefing, isSelected, onClick }) {
-  const sc = scoreColor(briefing.intentScore);
-
-  return (
-    <motion.button
-      variants={fadeUp}
-      onClick={onClick}
-      className={`w-full text-left glass noise rounded-xl p-4 transition-all border ${
-        isSelected
-          ? "border-cyan-400/50 ring-1 ring-cyan-400/20"
-          : "border-white/5 hover:border-white/10"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Phone size={14} className="text-white/40 shrink-0" />
-          <span className="text-white/90 font-mono text-sm truncate">
-            {briefing.from}
-          </span>
-        </div>
-        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${sc.bg} ${sc.text}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-          {briefing.intentScore}/100
-        </div>
-      </div>
-
-      <p className="text-white/50 text-xs leading-relaxed line-clamp-2 mb-2">
-        {briefing.qualificationPreview}
-      </p>
-
-      <div className="flex items-center gap-1.5 text-white/30 text-xs">
-        <Clock size={12} />
-        <span>{timeAgo(briefing.generatedAt)}</span>
-      </div>
-    </motion.button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Briefing Detail Panel
-// ---------------------------------------------------------------------------
-
-function BriefingDetail({ briefing, loading, onClosedWon }) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-white/30">
-        <RefreshCw size={20} className="animate-spin mr-2" />
-        Loading briefing...
-      </div>
-    );
-  }
-
-  if (!briefing) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-3">
-        <FileText size={40} className="opacity-30" />
-        <p>Select a briefing to view the full context handoff</p>
-      </div>
-    );
-  }
-
-  const sc = scoreColor(briefing.trigger?.intentScore ?? 0);
-
-  return (
-    <motion.div
-      key={briefing.briefingId}
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="space-y-4"
-    >
+    <motion.div variants={fadeUp} className="glass noise rounded-2xl p-5 border border-white/5">
       {/* Header */}
-      <div className="glass noise rounded-xl p-5">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div>
-            <h3 className="text-white font-semibold text-lg mb-1">
-              Lead: {briefing.trigger?.from ?? "Unknown"}
-            </h3>
-            <p className="text-white/40 text-xs font-mono">
-              Briefing ID: {briefing.briefingId}
-            </p>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 flex items-center justify-center">
+            <Shield size={20} className="text-primary" />
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${sc.bg} ${sc.text} text-sm font-bold`}>
-            <Target size={14} />
-            {briefing.trigger?.intentScore}/100
-            <span className="text-xs font-normal opacity-75">{sc.label}</span>
+          <div>
+            <h3 className="text-white font-bold text-lg">AI Bouncer Ledger</h3>
+            <p className="text-white/40 text-xs">ICP filter performance &amp; FinOps savings</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black text-emerald-400">{fmtUSD(stats.computeCapitalDefendedUSD)}</p>
+          <p className="text-white/30 text-xs">compute capital defended</p>
+        </div>
+      </div>
+
+      {/* Stat Cards Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        {/* Total Ingested */}
+        <div className="glass noise rounded-xl p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <BarChart3 size={12} className="text-primary" />
+            <span className="text-white/40 text-xs">Ingested</span>
+          </div>
+          <p className="text-white font-bold text-xl">{fmt(stats.totalIngested)}</p>
+        </div>
+
+        {/* Allowed */}
+        <div className="glass noise rounded-xl p-3 border border-emerald-400/10">
+          <div className="flex items-center gap-1.5 mb-1">
+            <ShieldCheck size={12} className="text-emerald-400" />
+            <span className="text-white/40 text-xs">Allowed</span>
+          </div>
+          <p className="text-emerald-400 font-bold text-xl">{fmt(stats.allowed)}</p>
+        </div>
+
+        {/* Rejected */}
+        <div className="glass noise rounded-xl p-3 border border-red-400/10">
+          <div className="flex items-center gap-1.5 mb-1">
+            <ShieldX size={12} className="text-red-400" />
+            <span className="text-white/40 text-xs">Rejected</span>
+          </div>
+          <p className="text-red-400 font-bold text-xl">{fmt(rejectedTotal)}</p>
+        </div>
+
+        {/* Pass Rate */}
+        <div className="glass noise rounded-xl p-3 border border-white/5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Filter size={12} className="text-amber-400" />
+            <span className="text-white/40 text-xs">Pass Rate</span>
+          </div>
+          <p className="text-amber-400 font-bold text-xl">{fmtPct(stats.passRate)}</p>
+        </div>
+      </div>
+
+      {/* Rejection Breakdown + Funnel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Rejection Breakdown */}
+        <div className="glass noise rounded-xl p-4 border border-white/5">
+          <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Rejection Breakdown</h4>
+
+          {/* Pre-filter bar */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-white/50">Deterministic Pre-Filter</span>
+              <span className="text-white/70 font-mono">{fmt(stats.rejectedDeterministic)}</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-red-500/80 to-red-400/60"
+                style={{ width: `${(stats.rejectedDeterministic / stats.totalIngested) * 100}%` }}
+              />
+            </div>
+            <p className="text-white/25 text-[10px] mt-0.5">Zero tokens spent — instant reject</p>
+          </div>
+
+          {/* LLM filter bar */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-white/50">LLM ICP Filter (Llama 3.1 8B)</span>
+              <span className="text-white/70 font-mono">{fmt(stats.rejectedLLM)}</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-orange-500/80 to-amber-400/60"
+                style={{ width: `${(stats.rejectedLLM / stats.totalIngested) * 100}%` }}
+              />
+            </div>
+            <p className="text-white/25 text-[10px] mt-0.5">~${stats.avgFilterCostUSD}/call &bull; Total: {fmtUSD(stats.totalFilterCostUSD)}</p>
+          </div>
+
+          {/* Passed bar */}
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-emerald-400/80">Passed → Engagement</span>
+              <span className="text-emerald-400 font-mono font-semibold">{fmt(stats.allowed)}</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500/80 to-accent/60"
+                style={{ width: `${(stats.allowed / stats.totalIngested) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-4 text-xs text-white/40">
-          <div className="flex items-center gap-1.5">
-            <Clock size={12} />
-            {formatTimestamp(briefing.generatedAt)}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MessageSquare size={12} />
-            {briefing.conversationTranscript?.length ?? 0} messages
+        {/* Ingestion Funnel */}
+        <div className="glass noise rounded-xl p-4 border border-white/5">
+          <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Ingestion Funnel</h4>
+          <div className="space-y-2">
+            {funnel.map((stage, i) => {
+              const maxCount = funnel[0]?.count || 1;
+              const pct = (stage.count / maxCount) * 100;
+              return (
+                <div key={i}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-white/60">{stage.stage}</span>
+                    <span className="text-white/80 font-mono font-semibold">{fmt(stage.count)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.8, delay: i * 0.1 }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: stage.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Section 1: Conversation Transcript */}
-      <BriefingSection icon={MessageSquare} title="Conversation Transcript" defaultOpen>
-        {briefing.conversationTranscript?.length > 0 ? (
-          <div className="space-y-3">
-            {briefing.conversationTranscript.map((entry, i) => (
-              <div key={i} className="flex gap-3">
-                <div className="shrink-0 w-6 h-6 rounded-full bg-cyan-400/10 flex items-center justify-center mt-0.5">
-                  <User size={12} className="text-cyan-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-white/60 font-mono text-xs">{entry.from}</span>
-                    <span className="text-white/20 text-xs">{formatTimestamp(entry.timestamp)}</span>
-                  </div>
-                  <p className="text-white/80 text-sm">{entry.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-white/40 italic">
-            Single inbound message — no prior conversation history.
-          </p>
-        )}
-
-        {/* Show the triggering message if transcript is empty */}
-        {(!briefing.conversationTranscript || briefing.conversationTranscript.length === 0) && briefing.trigger && (
-          <div className="mt-3 p-3 rounded-lg bg-cyan-400/5 border border-cyan-400/10">
-            <div className="flex items-center gap-2 mb-1 text-cyan-400 text-xs font-semibold">
-              <AlertTriangle size={12} />
-              Triggering Message
-            </div>
-            <p className="text-white/80 text-sm">{briefing.trigger.content}</p>
-          </div>
-        )}
-      </BriefingSection>
-
-      {/* Section 2: Qualification Data */}
-      <BriefingSection icon={Target} title="Qualification Data" defaultOpen>
-        <p className="whitespace-pre-wrap">{briefing.qualificationData}</p>
-      </BriefingSection>
-
-      {/* Section 3: Sentiment Analysis */}
-      <BriefingSection icon={Brain} title="Sentiment & Emotional Subtext">
-        <p className="whitespace-pre-wrap">{briefing.sentimentAnalysis}</p>
-      </BriefingSection>
-
-      {/* Section 4: Recommended Next Steps */}
-      <BriefingSection icon={Lightbulb} title="Recommended Next Steps">
-        <p className="whitespace-pre-wrap">{briefing.recommendedNextSteps}</p>
-      </BriefingSection>
-
-      {/* Action buttons */}
-      <div className="glass noise rounded-xl p-5">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Claim Lead */}
-          <button className="flex-1 py-2.5 rounded-lg bg-cyan-500/20 text-cyan-400 font-semibold hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-2 text-sm">
-            <CheckCircle size={16} />
-            Claim This Lead
-          </button>
-
-          {/* Closed-Won — RAG Flywheel */}
-          <button
-            onClick={() => onClosedWon && onClosedWon(briefing)}
-            className="flex-1 py-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold hover:bg-emerald-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
-          >
-            <Trophy size={16} />
-            Closed-Won &amp; Train AI
-          </button>
+      {/* Source Breakdown Footer */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="glass noise rounded-lg p-3 border border-white/5 text-center">
+          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Apollo</p>
+          <p className="text-white font-bold">{fmt(stats.ingestionSources.apollo.total)}</p>
+          <p className="text-white/25 text-[10px]">{fmt(stats.ingestionSources.apollo.passedPreFilter)} pre-filtered</p>
         </div>
-        <p className="text-white/30 text-xs mt-3 text-center">
-          Claim assigns you to this prospect. Closed-Won feeds your deal intel into the AI knowledge base.
-        </p>
+        <div className="glass noise rounded-lg p-3 border border-white/5 text-center">
+          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Proxycurl</p>
+          <p className="text-white font-bold">{fmt(stats.ingestionSources.proxycurl.enriched)}</p>
+          <p className="text-white/25 text-[10px]">{fmt(stats.ingestionSources.proxycurl.llmFiltered)} LLM-passed</p>
+        </div>
+        <div className="glass noise rounded-lg p-3 border border-white/5 text-center">
+          <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Manual</p>
+          <p className="text-white font-bold">{fmt(stats.ingestionSources.manual.total)}</p>
+          <p className="text-white/25 text-[10px]">{fmt(stats.ingestionSources.manual.passedPreFilter)} pre-filtered</p>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Briefings Page
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// 2. Engagement State Machine — Kanban Board
+// ===========================================================================
 
-export default function Briefings() {
-  const [briefings, setBriefings] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [listLoading, setListLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [error, setError] = useState(null);
-  const [closedWonBriefing, setClosedWonBriefing] = useState(null);
-
-  // ── Fetch briefing list ──
-  const fetchList = useCallback(async () => {
-    try {
-      const res = await fetch(BRIEFINGS_URL);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setBriefings(data.briefings ?? []);
-      setLastRefresh(new Date());
-      setError(null);
-    } catch (err) {
-      console.error("[Briefings] List fetch failed:", err);
-      setError(err.message);
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
-
-  // ── Fetch briefing detail ──
-  const fetchDetail = useCallback(async (id) => {
-    setDetailLoading(true);
-    try {
-      const res = await fetch(`${BRIEFINGS_URL}/${id}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setDetail(data);
-    } catch (err) {
-      console.error(`[Briefings] Detail fetch failed for ${id}:`, err);
-      setDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  // ── Initial load + polling ──
-  useEffect(() => {
-    fetchList();
-    const interval = setInterval(fetchList, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchList]);
-
-  // ── Fetch detail on selection ──
-  useEffect(() => {
-    if (selectedId) {
-      fetchDetail(selectedId);
-    } else {
-      setDetail(null);
-    }
-  }, [selectedId, fetchDetail]);
+function ProspectCard({ prospect }) {
+  const touchPct = (prospect.touchCount / prospect.maxTouches) * 100;
 
   return (
-      <div className="px-4 sm:px-6 py-8 max-w-7xl mx-auto">
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`glass noise rounded-xl p-3 border ${stateColorMap[prospect.currentState] ?? "border-white/5"} hover:border-white/20 transition-colors cursor-default group`}
+    >
+      {/* Top row: name + channel */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <p className="text-white/90 font-semibold text-sm truncate">{prospect.name}</p>
+          <p className="text-white/40 text-[11px] truncate">{prospect.role} @ {prospect.company}</p>
+        </div>
+        <div className="shrink-0 flex items-center gap-1.5">
+          {channelIcon(prospect.channel)}
+          <span className="text-white/30 text-[10px] uppercase">{prospect.channel}</span>
+        </div>
+      </div>
+
+      {/* ICP Confidence badge */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+          <Target size={10} />
+          {prospect.icpConfidence}% ICP
+        </div>
+        <span className="text-white/20 text-[10px]">{prospect.industry}</span>
+      </div>
+
+      {/* Touch progress */}
+      <div className="mb-2">
+        <div className="flex items-center justify-between text-[10px] mb-0.5">
+          <span className="text-white/30">Touches</span>
+          <span className="text-white/50 font-mono">{prospect.touchCount}/{prospect.maxTouches}</span>
+        </div>
+        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-primary/80 to-accent/60"
+            style={{ width: `${touchPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Signals row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[10px]">
+          {prospect.sentimentScore !== null && (
+            <span className="text-white/40">
+              Sentiment: <span className={prospect.sentimentScore > 0.5 ? "text-emerald-400" : "text-amber-400"}>
+                {(prospect.sentimentScore * 100).toFixed(0)}
+              </span>
+            </span>
+          )}
+          {prospect.emailOpened && (
+            <span className="flex items-center gap-0.5 text-cyan-400">
+              <Eye size={10} /> opened
+            </span>
+          )}
+          {prospect.linkClicked && (
+            <span className="flex items-center gap-0.5 text-emerald-400">
+              <Link2 size={10} /> clicked
+            </span>
+          )}
+        </div>
+        <span className="text-white/20 text-[10px]">{timeAgo(prospect.lastActivityAt)}</span>
+      </div>
+
+      {/* Cooldown countdown */}
+      {prospect.currentState === "Cooldown" && prospect.cooldownEndsAt && (
+        <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-1.5 text-[10px] text-orange-400/70">
+          <Clock size={10} />
+          Cooldown ends {timeAgo(prospect.cooldownEndsAt).replace(" ago", "")}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function EngagementKanban({ prospects }) {
+  return (
+    <motion.div variants={fadeUp} className="glass noise rounded-2xl p-5 border border-white/5">
       {/* Header */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={stagger}
-        className="mb-8"
-      >
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400/20 to-violet-400/20 flex items-center justify-center">
+            <Zap size={20} className="text-cyan-400" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-lg">Engagement State Machine</h3>
+            <p className="text-white/40 text-xs">LangGraph pipeline &mdash; {prospects.length} active prospects</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-white/30">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          Live
+        </div>
+      </div>
+
+      {/* Kanban columns — horizontal scroll on mobile */}
+      <div className="flex gap-4 overflow-x-auto pb-3 -mx-1 px-1 snap-x">
+        {KANBAN_COLUMNS.map((col) => {
+          const Icon = col.icon;
+          const colProspects = prospects.filter((p) => p.currentState === col.state);
+
+          return (
+            <div key={col.state} className="min-w-[220px] flex-1 snap-start">
+              {/* Column header */}
+              <div className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg bg-gradient-to-r ${col.bgGlow} to-transparent`}>
+                <Icon size={14} className={`text-${col.color}-400`} />
+                <span className="text-white/70 text-xs font-semibold">{col.state}</span>
+                <span className={`ml-auto text-${col.color}-400 text-xs font-bold bg-${col.color}-400/10 px-1.5 py-0.5 rounded-full`}>
+                  {colProspects.length}
+                </span>
+              </div>
+
+              {/* Cards */}
+              <div className="space-y-2 min-h-[80px]">
+                {colProspects.length === 0 ? (
+                  <div className="flex items-center justify-center h-20 rounded-xl border border-dashed border-white/5 text-white/15 text-xs">
+                    Empty
+                  </div>
+                ) : (
+                  colProspects.map((p) => <ProspectCard key={p.id} prospect={p} />)
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+// ===========================================================================
+// 3. Triage Launchpad — Priority Queue
+// ===========================================================================
+
+function TriageRow({ item, onAssign }) {
+  const ic = intentColor(item.intentScore);
+  const sc = sentimentIcon(item.sentimentLabel);
+
+  return (
+    <motion.div
+      variants={fadeUp}
+      className="glass noise rounded-xl p-4 border border-white/5 hover:border-primary/20 transition-all"
+    >
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-white font-semibold text-sm">{item.name}</p>
+            <span className="text-white/20">|</span>
+            <p className="text-white/50 text-xs truncate">{item.role}, {item.company}</p>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            {/* Intent Score */}
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full ${ic.bg} ${ic.text} font-bold`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${ic.dot}`} />
+              {item.intentScore}/100
+            </div>
+            {/* Sentiment */}
+            <div className="flex items-center gap-1">
+              <span className="text-sm">{sc.emoji}</span>
+              <span className={`${sc.color} capitalize`}>{item.sentimentLabel}</span>
+            </div>
+            {/* Reply channel */}
+            <div className="flex items-center gap-1 text-white/30">
+              {channelIcon(item.replyChannel)}
+              <span className="capitalize">{item.replyChannel}</span>
+            </div>
+            {/* Timing */}
+            <span className="text-white/25">{timeAgo(item.repliedAt)}</span>
+          </div>
+        </div>
+
+        {/* Schedule Partner Badge */}
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          {item.scheduleHumanPartner && (
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+              <Flame size={10} />
+              Human Partner
+            </span>
+          )}
+          <button
+            onClick={() => onAssign(item)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 transition-colors"
+          >
+            <UserPlus size={12} />
+            Assign to SP
+          </button>
+        </div>
+      </div>
+
+      {/* Engagement Context */}
+      <div className="flex items-center gap-4 text-[10px] text-white/30 mb-3">
+        <span>{item.touchesBeforeReply} touches before reply</span>
+        <span>&bull;</span>
+        <span>{item.engagementDurationDays} day engagement</span>
+        {item.humanPartnerReason && (
+          <>
+            <span>&bull;</span>
+            <span className="text-amber-400/60">{item.humanPartnerReason}</span>
+          </>
+        )}
+      </div>
+
+      {/* Section Zero: Outbound Promise */}
+      <div className="rounded-lg bg-gradient-to-r from-primary/5 to-transparent border-l-2 border-primary/40 px-4 py-3">
+        <div className="flex items-center gap-1.5 mb-1.5 text-primary text-[10px] font-semibold uppercase tracking-wider">
+          <Sparkles size={10} />
+          &sect; 0: Outbound Promise
+        </div>
+        <blockquote className="text-white/70 text-xs leading-relaxed italic">
+          &ldquo;{item.sectionZeroPromise}&rdquo;
+        </blockquote>
+      </div>
+    </motion.div>
+  );
+}
+
+function TriageLaunchpad({ queue, onAssign }) {
+  // Sort by intent score descending (highest priority first)
+  const sorted = [...queue].sort((a, b) => b.intentScore - a.intentScore);
+
+  return (
+    <motion.div variants={fadeUp} className="glass noise rounded-2xl p-5 border border-white/5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400/20 to-red-400/20 flex items-center justify-center">
+            <Target size={20} className="text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-lg">Triage Launchpad</h3>
+            <p className="text-white/40 text-xs">Prospects who replied &mdash; crossed the Event Bridge</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/30 text-xs">{queue.length} awaiting triage</span>
+        </div>
+      </div>
+
+      {/* Queue */}
+      {sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-32 text-white/20 gap-2">
+          <Target size={32} className="opacity-30" />
+          <p className="text-sm">No replies in the queue</p>
+          <p className="text-[10px]">Prospects will appear here when they respond to outreach</p>
+        </div>
+      ) : (
+        <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-3">
+          {sorted.map((item) => (
+            <TriageRow key={item.id} item={item} onAssign={onAssign} />
+          ))}
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
+// ===========================================================================
+// Main Export — ToFu Radar Command Center
+// ===========================================================================
+
+export default function Briefings() {
+  const [bouncerStats, setBouncerStats] = useState(MOCK_BOUNCER_STATS);
+  const [activeGraph, setActiveGraph] = useState(MOCK_ACTIVE_GRAPH);
+  const [triageQueue, setTriageQueue] = useState(MOCK_TRIAGE_QUEUE);
+  const [ingestionFunnel, setIngestionFunnel] = useState(MOCK_INGESTION_FUNNEL);
+  const [loading, setLoading] = useState(!USE_MOCK);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // ── Fetch live data (when USE_MOCK is false) ──
+  const fetchAll = useCallback(async () => {
+    if (USE_MOCK) return;
+    setLoading(true);
+    try {
+      const [statsRes, graphRes, triageRes] = await Promise.all([
+        fetch(`${API_BASE}/bouncer-stats`),
+        fetch(`${API_BASE}/active-graph`),
+        fetch(`${API_BASE}/triage-queue`),
+      ]);
+
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        setBouncerStats(data);
+      }
+      if (graphRes.ok) {
+        const data = await graphRes.json();
+        setActiveGraph(data.engagements ?? data);
+      }
+      if (triageRes.ok) {
+        const data = await triageRes.json();
+        setTriageQueue(data.queue ?? data);
+      }
+
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error("[ToFu Radar] Fetch error, falling back to mock:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    if (!USE_MOCK) {
+      const interval = setInterval(fetchAll, 30_000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchAll]);
+
+  // ── Assign to SP handler (mock for now) ──
+  const handleAssign = (item) => {
+    console.log("[ToFu Radar] Assign to SP:", item.name, item.company);
+    // Future: open SP assignment modal or POST to /api/outbound/assign
+  };
+
+  return (
+    <div className="px-4 sm:px-6 py-8 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <motion.div initial="hidden" animate="visible" variants={stagger} className="mb-8">
         <motion.div variants={fadeUp} className="flex items-center gap-3 mb-1">
           <h1 className="text-3xl sm:text-4xl font-bold gradient-text">
-            Lead Briefings
+            ToFu Radar
           </h1>
+          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+            Command Center
+          </span>
         </motion.div>
 
         <motion.div variants={fadeUp} className="flex items-center justify-between mt-3">
           <p className="text-white/40 text-sm">
-            High-intent lead handoff console for Sovereign Professionals
+            AI SDR Outbound Engine telemetry &mdash; autonomous top-of-funnel acquisition
           </p>
           <div className="flex items-center gap-3">
             {lastRefresh && (
               <span className="text-white/20 text-xs">
-                Updated {timeAgo(lastRefresh.toISOString())}
+                {timeAgo(lastRefresh.toISOString())}
               </span>
             )}
             <button
-              onClick={fetchList}
+              onClick={fetchAll}
               className="p-2 rounded-lg glass noise hover:bg-white/10 transition-colors"
-              title="Refresh briefings"
+              title="Refresh data"
             >
               <RefreshCw
                 size={14}
-                className={`text-white/40 ${listLoading ? "animate-spin" : ""}`}
+                className={`text-white/40 ${loading ? "animate-spin" : ""}`}
               />
             </button>
           </div>
         </motion.div>
       </motion.div>
 
-      {/* Error banner */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 glass noise rounded-xl p-4 border border-red-400/20"
-        >
-          <div className="flex items-center gap-2 text-red-400 text-sm">
-            <AlertTriangle size={16} />
-            <span>Failed to load briefings: {error}</span>
-          </div>
-        </motion.div>
-      )}
+      {/* Content */}
+      <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
+        {/* 1. AI Bouncer Ledger */}
+        <BouncerLedger stats={bouncerStats} funnel={ingestionFunnel} />
 
-      {/* Main layout — list + detail */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={stagger}
-        className="grid grid-cols-1 lg:grid-cols-5 gap-6"
-      >
-        {/* Briefing List */}
-        <motion.div variants={fadeUp} className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-white/60 text-sm font-semibold uppercase tracking-wider">
-              Active Briefings
-            </h2>
-            <span className="text-white/30 text-xs">
-              {briefings.length} lead{briefings.length !== 1 ? "s" : ""}
-            </span>
-          </div>
+        {/* 2. Engagement State Machine Kanban */}
+        <EngagementKanban prospects={activeGraph} />
 
-          {listLoading && briefings.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-white/30">
-              <RefreshCw size={18} className="animate-spin mr-2" />
-              Loading...
-            </div>
-          ) : briefings.length === 0 ? (
-            <div className="glass noise rounded-xl p-8 text-center">
-              <FileText size={32} className="mx-auto text-white/20 mb-3" />
-              <p className="text-white/40 text-sm">No active briefings</p>
-              <p className="text-white/20 text-xs mt-1">
-                Briefings appear when leads score &gt; 85/100 intent
-              </p>
-            </div>
-          ) : (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={stagger}
-              className="space-y-2"
-            >
-              {briefings.map((b) => (
-                <BriefingCard
-                  key={b.briefingId}
-                  briefing={b}
-                  isSelected={selectedId === b.briefingId}
-                  onClick={() => setSelectedId(b.briefingId)}
-                />
-              ))}
-            </motion.div>
-          )}
-        </motion.div>
-
-        {/* Briefing Detail */}
-        <motion.div variants={fadeUp} className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-white/60 text-sm font-semibold uppercase tracking-wider">
-              Full Context Briefing
-            </h2>
-            {detail && (
-              <button
-                onClick={() => { setSelectedId(null); setDetail(null); }}
-                className="text-white/30 text-xs hover:text-white/50 transition-colors"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          <BriefingDetail
-            briefing={detail}
-            loading={detailLoading}
-            onClosedWon={(b) => setClosedWonBriefing(b)}
-          />
-        </motion.div>
+        {/* 3. Triage Launchpad */}
+        <TriageLaunchpad queue={triageQueue} onAssign={handleAssign} />
       </motion.div>
-
-      {/* Closed-Won Modal */}
-      {closedWonBriefing && (
-        <ClosedWonModal
-          briefing={closedWonBriefing}
-          onClose={() => setClosedWonBriefing(null)}
-          onSuccess={(data) => {
-            console.log("[Briefings] Knowledge ingested:", data);
-          }}
-        />
-      )}
-      </div>
+    </div>
   );
 }

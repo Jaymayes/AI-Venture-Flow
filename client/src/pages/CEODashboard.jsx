@@ -31,6 +31,7 @@ import {
   Flame,
   Ghost,
   Sparkles,
+  Radio,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -269,7 +270,7 @@ function Section({ icon: Icon, title, subtitle }) {
 
 const ceoTabs = [
   { id: "dashboard", label: "Dashboard", icon: Activity, color: "emerald" },
-  { id: "briefings", label: "Lead Briefings", icon: FileText, color: "cyan" },
+  { id: "briefings", label: "ToFu Radar", icon: Radio, color: "cyan" },
   { id: "recruiting", label: "Recruitment Ops", icon: Users, color: "violet" },
   { id: "disbursements", label: "Disbursements", icon: Banknote, color: "amber" },
   { id: "sp-onboarding", label: "SP Onboarding", icon: UserPlus, color: "teal" },
