@@ -10,6 +10,7 @@ import {
   Target,
   Users,
   Scale,
+  FileText,
   TrendingUp,
   Bot,
   Crosshair,
@@ -839,6 +840,63 @@ export default function Playbook() {
             transition={{ duration: 0.3 }}
           >
             <ActiveComponent />
+          </motion.div>
+        </motion.div>
+
+        {/* ══════════ SOW PARTNERSHIP SUMMARY ══════════ */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={stagger}
+          className="mx-auto mt-16 max-w-4xl px-4"
+        >
+          <motion.div variants={fadeUp} className="glass noise rounded-2xl p-8 md:p-10">
+            <div className="mb-6 flex items-center gap-3">
+              <FileText size={24} className="text-accent" />
+              <h2 className="text-2xl font-bold">Sovereign Professional Partnership</h2>
+            </div>
+            <p className="mb-8 text-sm text-white/50">
+              Our Master Statement of Work is engineered for DOL Economic Reality
+              Test compliance and Anti-Kickback Statute (AKS) protection. Key pillars:
+            </p>
+            <div className="mb-8 grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <Scale size={20} className="mb-3 text-primary" />
+                <h3 className="mb-1 text-sm font-bold">Right to Substitute</h3>
+                <p className="text-xs leading-relaxed text-white/50">
+                  You are not economically compelled to perform work personally.
+                  Hire your own assistants or sub-contractors to fulfill
+                  deliverables. You assume full managerial responsibility.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <DollarSign size={20} className="mb-3 text-accent" />
+                <h3 className="mb-1 text-sm font-bold">Dual-Tier Compensation</h3>
+                <p className="text-xs leading-relaxed text-white/50">
+                  Fixed monthly retainer ($2K–$6K) for strategic availability plus
+                  performance commission (15–20% TCV) on closed enterprise deals.
+                  Retainer is FMV-justified, not volume-based.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <Lock size={20} className="mb-3 text-amber-400" />
+                <h3 className="mb-1 text-sm font-bold">Zero Trust Perimeter</h3>
+                <p className="text-xs leading-relaxed text-white/50">
+                  All pipeline management via Cloudflare Access. AI routing
+                  logic, D1 schemas, and intent scoring algorithms remain
+                  exclusive IP of Referral Service LLC.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <Link
+                href="/onboarding"
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
+              >
+                Request Partnership <ChevronRight size={16} />
+              </Link>
+            </div>
           </motion.div>
         </motion.div>
       </div>

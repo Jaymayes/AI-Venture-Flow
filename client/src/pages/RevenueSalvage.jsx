@@ -14,12 +14,17 @@ import {
   Loader2,
   ChevronRight,
   Eye,
+  Database,
 } from "lucide-react";
+import {
+  fetchSalvageKanban,
+  executeSalvageTakeover,
+  seedSalvageData,
+} from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
-// Constants — live endpoints only, no mock fallback
+// Constants
 // ---------------------------------------------------------------------------
-const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 30_000;
 
 const fadeUp = {
@@ -103,6 +108,47 @@ const alertConfig = {
     pulse: true,
   },
 };
+
+// ---------------------------------------------------------------------------
+// Adapter: SalvageDeal (backend) → DealCard props (frontend)
+// ---------------------------------------------------------------------------
+
+const SENTIMENT_MAP = {
+  stable:   { score: 0.78, delta:  0.05, alert: null },
+  warning:  { score: 0.42, delta: -0.18, alert: "disengagement" },
+  critical: { score: 0.15, delta: -0.35, alert: "churn_imminent" },
+};
+
+function mapSalvageDeal(deal) {
+  const daysAgo = Math.max(
+    0,
+    Math.floor((Date.now() - deal.lastTouchAt) / (1000 * 60 * 60 * 24))
+  );
+  const sm = SENTIMENT_MAP[deal.sentiment] || SENTIMENT_MAP.stable;
+
+  // Derive alert based on zone — critical zone can also show frustration_spike
+  let sentimentAlert = sm.alert;
+  if (daysAgo >= 18 && deal.sentiment === "critical") {
+    sentimentAlert = "churn_imminent";
+  } else if (daysAgo >= 14 && deal.sentiment === "warning") {
+    sentimentAlert = "frustration_spike";
+  }
+
+  return {
+    id: deal.id,
+    prospectName: deal.clientName,
+    prospectCompany: `${deal.spName} Portfolio`,
+    spName: deal.spName,
+    tcv: deal.tcv,
+    daysSinceHandoff: daysAgo,
+    stage: deal.status,
+    sentimentScore: sm.score,
+    sentimentDelta: sm.delta,
+    lastContactAt: new Date(deal.lastTouchAt).toISOString(),
+    channel: "email",
+    sentimentAlert,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Deal Card
@@ -226,7 +272,7 @@ function DealCard({ deal, onTakeover }) {
 // Kanban Column
 // ---------------------------------------------------------------------------
 
-function KanbanColumn({ zone, deals }) {
+function KanbanColumn({ zone, deals, onTakeover }) {
   const zc = zoneConfig[zone];
   const totalTCV = deals.reduce((sum, d) => sum + (d.tcv ?? 0), 0);
 
@@ -252,7 +298,7 @@ function KanbanColumn({ zone, deals }) {
           <div className="text-center py-8 text-white/20 text-xs">No deals in this zone</div>
         )}
         {deals.map((deal) => (
-          <DealCard key={deal.id} deal={deal} />
+          <DealCard key={deal.id} deal={deal} onTakeover={onTakeover} />
         ))}
       </motion.div>
     </div>
@@ -266,44 +312,44 @@ function KanbanColumn({ zone, deals }) {
 export function RevenueSalvageContent() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [seeding, setSeeding] = useState(false);
 
   const fetchDeals = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const res = await fetch(`${API_BASE}/override/pipeline`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const data = await res.json();
-      const allDeals = [
-        ...(data.pipeline?.greenZone ?? []),
-        ...(data.pipeline?.amberZone ?? []),
-        ...(data.pipeline?.redZone ?? []),
-      ].map((d) => ({
-        id: d.dealId,
-        prospectName: d.clientName,
-        prospectCompany: d.clientCompany,
-        spName: d.spName,
-        tcv: d.projectedTcv,
-        daysSinceHandoff: d.daysSinceHandoff,
-        stage: d.stage,
-        sentimentScore: d.sentimentScore,
-        sentimentDelta: d.sentimentEmergency?.delta ?? 0,
-        lastContactAt: d.lastContactAt,
-        channel: d.channel,
-        sentimentAlert: d.sentimentEmergency?.active
-          ? d.sentimentEmergency.type
-          : null,
-      }));
-      setDeals(allDeals);
+      const data = await fetchSalvageKanban();
+      const mapped = (data.deals ?? []).map(mapSalvageDeal);
+      setDeals(mapped);
       setLastRefresh(new Date());
+      setError(null);
     } catch (err) {
-      console.warn("[RevenueSalvage] Fetch failed:", err.message);
-      setDeals([]);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleTakeover = useCallback(async (dealId) => {
+    try {
+      await executeSalvageTakeover(dealId);
+      await fetchDeals();
+    } catch (err) {
+      setError(`Takeover failed: ${err.message}`);
+    }
+  }, [fetchDeals]);
+
+  const handleSeed = useCallback(async () => {
+    setSeeding(true);
+    try {
+      await seedSalvageData();
+      await fetchDeals();
+    } catch (err) {
+      setError(`Seed failed: ${err.message}`);
+    } finally {
+      setSeeding(false);
+    }
+  }, [fetchDeals]);
 
   useEffect(() => {
     fetchDeals();
@@ -333,7 +379,7 @@ export function RevenueSalvageContent() {
             <div>
               <h2 className="text-xl font-bold text-white">Revenue Salvage & Override Command</h2>
               <p className="text-white/40 text-sm">
-                21-Day Burn-Down Kanban \u00b7 Intercept decaying TCV before churn
+                21-Day Burn-Down Kanban · Intercept decaying TCV before churn
               </p>
             </div>
           </div>
@@ -343,6 +389,14 @@ export function RevenueSalvageContent() {
                 {lastRefresh.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
               </span>
             )}
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold transition-all disabled:opacity-40"
+            >
+              {seeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+              Seed Demo
+            </button>
             <button
               onClick={fetchDeals}
               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-red-400 transition-all"
@@ -382,6 +436,16 @@ export function RevenueSalvageContent() {
         </div>
       </motion.div>
 
+      {/* Error Banner */}
+      {error && (
+        <motion.div variants={fadeUp} className="glass noise rounded-xl p-4 border border-red-500/30 bg-red-500/5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="text-red-400 shrink-0" />
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -393,16 +457,16 @@ export function RevenueSalvageContent() {
       {/* 21-Day Kanban Board */}
       {!loading && (
         <motion.div variants={fadeUp} className="flex gap-4 overflow-x-auto pb-4">
-          <KanbanColumn zone="green" deals={greenDeals} />
-          <KanbanColumn zone="amber" deals={amberDeals} />
-          <KanbanColumn zone="red" deals={redDeals} />
+          <KanbanColumn zone="green" deals={greenDeals} onTakeover={handleTakeover} />
+          <KanbanColumn zone="amber" deals={amberDeals} onTakeover={handleTakeover} />
+          <KanbanColumn zone="red" deals={redDeals} onTakeover={handleTakeover} />
         </motion.div>
       )}
 
       {/* Protocol Legend */}
       <motion.div variants={fadeUp} className="glass noise rounded-xl p-4 border border-white/10">
         <h4 className="text-white/60 text-xs font-bold uppercase tracking-wider mb-3">
-          Hostile Takeover Protocol \u2014 What Happens on Execute
+          Hostile Takeover Protocol — What Happens on Execute
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div className="flex items-start gap-2">

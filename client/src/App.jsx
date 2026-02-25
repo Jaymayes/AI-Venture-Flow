@@ -13,9 +13,15 @@ import Disclaimer from "./pages/Disclaimer";
 import Accessibility from "./pages/Accessibility";
 import AcceptableUse from "./pages/AcceptableUse";
 import Playbook from "./pages/Playbook";
+import Onboarding from "./pages/Onboarding";
+import TeamDelegation from "./pages/TeamDelegation";
 import Disbursements from "./pages/Disbursements";
+import TriageLaunchpad from "./pages/TriageLaunchpad";
+import EngagementDetail from "./pages/EngagementDetail";
+import CampaignStudio from "./pages/CampaignStudio";
 import AuthGate from "./components/AuthGate";
 import SPGate from "./components/SPGate";
+import Portal from "./pages/Portal";
 import ChatPanel from "./components/ChatPanel";
 import LegalFooter from "./components/LegalFooter";
 import "./index.css";
@@ -53,8 +59,26 @@ export default function App() {
           <Route path="/playbook">
             <SPProtectedRoute component={Playbook} />
           </Route>
+          <Route path="/onboarding">
+            <SPProtectedRoute component={Onboarding} />
+          </Route>
+          <Route path="/delegation">
+            <SPProtectedRoute component={TeamDelegation} />
+          </Route>
           <Route path="/disbursements">
             <ProtectedRoute component={Disbursements} />
+          </Route>
+          <Route path="/triage/:id">
+            <ProtectedRoute component={EngagementDetail} />
+          </Route>
+          <Route path="/triage">
+            <ProtectedRoute component={TriageLaunchpad} />
+          </Route>
+          <Route path="/campaign">
+            <ProtectedRoute component={CampaignStudio} />
+          </Route>
+          <Route path="/portal">
+            <ProtectedRoute component={Portal} />
           </Route>
           <Route path="/recruit" component={Recruit} />
           <Route path="/outreach" component={Outreach} />

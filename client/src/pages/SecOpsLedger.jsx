@@ -19,11 +19,11 @@ import {
   UserX,
   Crown,
 } from "lucide-react";
+import { fetchSecOpsLedger } from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
-// Constants — live endpoints only, no mock fallback
+// Constants
 // ---------------------------------------------------------------------------
-const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api";
 const POLL_INTERVAL = 15_000; // Faster poll for security
 
 const fadeUp = {
@@ -102,6 +102,41 @@ const riskBg = (score) => {
 };
 
 // ---------------------------------------------------------------------------
+// Record Mapper — translates SecurityIntercept to legacy UI shape
+// ---------------------------------------------------------------------------
+
+const THREAT_LABELS = {
+  data_exfiltration: "Exfiltration Attempt",
+  remote_code_execution: "Privilege Escalation",
+  unauthorized_network: "Suspicious Pattern",
+  malicious_payload: "Supply Chain Injection",
+  privilege_escalation: "Privilege Escalation",
+  filesystem_access: "Suspicious Pattern",
+  supply_chain: "Supply Chain Injection",
+  steganography: "Suspicious Pattern",
+  scanner_crash: "Scanner Crash (Fail-Closed)",
+};
+
+function mapInterceptToFeed(intercept) {
+  const primaryThreat = intercept.threats?.[0] ?? "None";
+  const actionTaken = intercept.status === "quarantined" ? "REVIEW" : "BLOCKED";
+
+  return {
+    id: intercept.id,
+    timestamp: intercept.timestamp,
+    spId: intercept.actor?.split(" ")[0] ?? "AI",
+    spName: intercept.actor ?? "Autonomous Developer",
+    verdict: actionTaken,
+    riskScore: intercept.riskScore,
+    threatVector: THREAT_LABELS[primaryThreat] ?? "Suspicious Pattern",
+    skillName: intercept.skillName ?? intercept.id?.substring(0, 12),
+    deceptionAssessment: intercept.threats?.length > 0
+      ? `Detected ${intercept.threats.length} threat vector(s): ${intercept.threats.map(t => THREAT_LABELS[t] ?? t).join(", ")}. Code payload was ${intercept.status === "quarantined" ? "quarantined for CEO review" : "neutralized and blocked from execution"}.`
+      : "No specific threat vectors identified. Blocked by fail-closed security policy.",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Threat Feed Item
 // ---------------------------------------------------------------------------
 
@@ -135,7 +170,7 @@ function ThreatFeedItem({ scan }) {
           <div className="flex items-center gap-2 mb-2">
             <VectorIcon size={12} className={vc.color} />
             <span className="text-white/70 text-xs font-medium">{scan.threatVector}</span>
-            <span className="text-white/20 text-[10px]">\u00b7</span>
+            <span className="text-white/20 text-[10px]">·</span>
             <span className="text-white/30 text-xs font-mono">{scan.skillName}</span>
           </div>
 
@@ -184,7 +219,7 @@ function QuarantineItem({ scan, onApprove, onBlock }) {
             </span>
           </div>
           <p className="text-white/40 text-xs">
-            {scan.spId} \u00b7 {scan.spName} \u00b7 {scan.threatVector}
+            {scan.spId} · {scan.spName} · {scan.threatVector}
           </p>
         </div>
         <span className="text-white/20 text-[10px]">{fmtTimeAgo(scan.timestamp)}</span>
@@ -248,7 +283,7 @@ function LiabilityRow({ sp, onRevoke }) {
             </span>
           </div>
           <p className="text-white/30 text-xs">
-            {sp.blocksTotal} total blocks \u00b7 Last: {fmtTimeAgo(sp.lastBlockAt)}
+            {sp.blocksTotal} total blocks · Last: {fmtTimeAgo(sp.lastBlockAt)}
           </p>
         </div>
       </div>
@@ -287,34 +322,12 @@ export function SecOpsLedgerContent() {
 
   const fetchData = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${API_BASE}/secops/threat-feed`, { headers });
-      const data = await res.json();
-      const feed = (data.liveIntercepts ?? []).map((e) => ({
-        id: e.eventId,
-        timestamp: e.timestamp,
-        spId: e.spId,
-        spName: e.spName,
-        verdict: e.actionTaken === "QUARANTINED" ? "REVIEW" : e.actionTaken,
-        riskScore: e.riskScore,
-        threatVector: e.threatVector,
-        skillName: e.skillName,
-        deceptionAssessment: e.deceptionAssessment,
-      }));
-      const liabilityData = (data.spLiabilityIndex ?? []).map((sp) => ({
-        spId: sp.spId,
-        spName: sp.spName,
-        blocksThisWeek: sp.flagCount7d,
-        blocksTotal: sp.flagCountTotal,
-        lastBlockAt: sp.lastFlagAt,
-        status: sp.status === "flagged" ? "flagged" : sp.status === "warning" ? "warning" : "clean",
-      }));
+      const data = await fetchSecOpsLedger();
+      const feed = (data.intercepts ?? []).map(mapInterceptToFeed);
       setThreatFeed(feed);
-      setLiability(liabilityData);
+      setLiability([]); // SP Liability Index — not tracked per-SP in MVP
       setLastRefresh(new Date());
     } catch (err) {
-      console.warn("[SecOps] Fetch failed:", err.message);
       setThreatFeed([]);
       setLiability([]);
     } finally {
@@ -350,7 +363,7 @@ export function SecOpsLedgerContent() {
             <div>
               <h2 className="text-xl font-bold text-white">Zero-Trust SecOps & Shadow AI Ledger</h2>
               <p className="text-white/40 text-sm">
-                AST Scanner Intercepts \u00b7 SP Liability Index \u00b7 Quarantine Queue
+                AST Scanner Intercepts · SP Liability Index · Quarantine Queue
               </p>
             </div>
           </div>

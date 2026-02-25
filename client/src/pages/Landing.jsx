@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot,
   Shield,
@@ -9,13 +9,17 @@ import {
   BookOpen,
   Users,
   Check,
+  CheckCircle,
   Clock,
   Globe,
   Lock,
   ChevronRight,
   Menu,
   X,
+  Send,
+  Loader2,
 } from "lucide-react";
+import { submitInboundLead } from "../lib/triage-client";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -101,10 +105,30 @@ const navLinks = ["Modules", "Pricing", "Compliance"];
 
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [leadForm, setLeadForm] = useState({ name: "", email: "", company: "", context: "" });
+  const [formStatus, setFormStatus] = useState("idle"); // idle | loading | success | error
 
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setMenuOpen(false);
+  };
+
+  const handleLeadSubmit = async (e) => {
+    e.preventDefault();
+    setFormStatus("loading");
+    try {
+      await submitInboundLead({
+        source: "website",
+        prospectName: leadForm.name,
+        email: leadForm.email,
+        company: leadForm.company,
+        behavioralContext: leadForm.context || undefined,
+      });
+      setFormStatus("success");
+    } catch (err) {
+      console.error("[LeadCapture] Submit failed:", err);
+      setFormStatus("error");
+    }
   };
 
   return (
@@ -263,7 +287,7 @@ export default function Landing() {
             className="flex flex-wrap items-center justify-center gap-4"
           >
             <button
-              onClick={() => scrollTo("pricing")}
+              onClick={() => scrollTo("contact")}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
               Get a quote
@@ -477,42 +501,142 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══════════ CTA ══════════ */}
-      <section className="relative z-10 px-6 py-24">
+      {/* ══════════ CONTACT / LEAD CAPTURE ══════════ */}
+      <section id="contact" className="relative z-10 px-6 py-24">
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
+          viewport={{ once: true, amount: 0.2 }}
           variants={stagger}
-          className="glass noise mx-auto max-w-4xl overflow-hidden rounded-3xl p-12 text-center md:p-16"
+          className="mx-auto max-w-4xl"
         >
-          <motion.div variants={fadeUp}>
-            <Clock size={32} className="mx-auto mb-4 text-accent" />
+          <motion.div variants={fadeUp} className="mb-12 text-center">
+            <Send size={32} className="mx-auto mb-4 text-accent" />
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+              Deploy in <span className="gradient-text">Days</span>
+            </h2>
+            <p className="mx-auto max-w-lg text-white/50">
+              Tell us about your business and we'll design a custom AI workforce
+              that fits your operations. No obligation, no fluff.
+            </p>
           </motion.div>
-          <motion.h2
-            variants={fadeUp}
-            className="mb-4 text-3xl font-bold md:text-4xl"
-          >
-            Deploy in <span className="gradient-text">Days</span>
-          </motion.h2>
-          <motion.p
-            variants={fadeUp}
-            className="mx-auto mb-8 max-w-lg text-white/50"
-          >
-            From months to weeks. Venture modules reduce build cycles
-            dramatically. Get your AI Digital Employees up and running faster
-            than ever.
-          </motion.p>
+
           <motion.div
             variants={fadeUp}
-            className="flex flex-wrap items-center justify-center gap-4"
+            className="glass noise mx-auto max-w-xl overflow-hidden rounded-2xl p-8 md:p-10"
           >
-            <button
-              onClick={() => scrollTo("pricing")}
-              className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
-            >
-              Get started
-            </button>
+            <AnimatePresence mode="wait">
+              {formStatus === "success" ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center py-8 text-center"
+                >
+                  <CheckCircle size={48} className="mb-4 text-accent" />
+                  <h3 className="mb-2 text-xl font-bold">You're in the pipeline</h3>
+                  <p className="text-white/50">
+                    Our AI SDR is already researching your company. Expect a
+                    personalized follow-up within 24 hours.
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.form
+                  key="form"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onSubmit={handleLeadSubmit}
+                  className="space-y-5"
+                >
+                  <div>
+                    <label htmlFor="lead-name" className="mb-1.5 block text-sm font-medium text-white/70">
+                      Full Name <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      id="lead-name"
+                      type="text"
+                      required
+                      value={leadForm.name}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Jane Smith"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lead-email" className="mb-1.5 block text-sm font-medium text-white/70">
+                      Work Email <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      id="lead-email"
+                      type="email"
+                      required
+                      value={leadForm.email}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="jane@acme.com"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lead-company" className="mb-1.5 block text-sm font-medium text-white/70">
+                      Company <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      id="lead-company"
+                      type="text"
+                      required
+                      value={leadForm.company}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, company: e.target.value }))}
+                      placeholder="Acme Corp"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lead-context" className="mb-1.5 block text-sm font-medium text-white/70">
+                      How can we help?
+                    </label>
+                    <textarea
+                      id="lead-context"
+                      rows={3}
+                      value={leadForm.context}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, context: e.target.value }))}
+                      placeholder="Tell us about the AI workforce challenges you're facing..."
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30 resize-none"
+                    />
+                  </div>
+
+                  {formStatus === "error" && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+                      Something went wrong. Please try again.
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={formStatus === "loading"}
+                    className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90 disabled:opacity-60"
+                  >
+                    {formStatus === "loading" ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        Get a Quote <ChevronRight size={16} />
+                      </>
+                    )}
+                  </button>
+                </motion.form>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          <motion.div
+            variants={fadeUp}
+            className="mt-8 flex flex-wrap items-center justify-center gap-4"
+          >
             <Link
               href="/dashboard"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 font-semibold text-white transition hover:bg-white/10"

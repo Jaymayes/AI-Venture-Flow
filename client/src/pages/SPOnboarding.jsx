@@ -19,13 +19,12 @@ import {
   CreditCard,
   Key,
 } from "lucide-react";
+import { deploySPOnboarding, fetchSPLedger } from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const API_BASE =
-  "https://moltbot-triage-engine.jamarr.workers.dev/api/recruitment";
 const POLL_INTERVAL = 30_000;
 
 // Engagement Tiers (mirrors backend ENGAGEMENT_TIERS)
@@ -122,38 +121,37 @@ function OverallBadge({ status }) {
 }
 
 // ---------------------------------------------------------------------------
-// API Layer
+// Record Mapper — translates lightweight SP model to legacy UI shape
 // ---------------------------------------------------------------------------
 
-async function deployOnboarding(formData, authToken) {
-  const res = await fetch(`${API_BASE}/onboard-sp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: JSON.stringify(formData),
-  });
-  return res.json();
-}
+const OVERALL_MAP = {
+  pending_legal: "in_progress",
+  active: "complete",
+  suspended: "partial_failure",
+};
 
-async function fetchPipeline(authToken) {
-  const res = await fetch(`${API_BASE}/onboarding-pipeline`, {
-    headers: {
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-  });
-  return res.json();
-}
+function mapSPRecord(sp) {
+  const isActive = sp.status === "active";
+  const isSuspended = sp.status === "suspended";
 
-async function refreshSPStatus(email, authToken) {
-  const res = await fetch(`${API_BASE}/onboarding/${encodeURIComponent(email)}/refresh`, {
-    method: "POST",
-    headers: {
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-  });
-  return res.json();
+  return {
+    spName: sp.legalName,
+    spEmail: sp.email,
+    spPhone: sp.phone,
+    tier: sp.tier,
+    overallStatus: OVERALL_MAP[sp.status] || "in_progress",
+    initiatedAt: sp.onboardedAt,
+    initiatedBy: "CEO",
+    // Gate statuses derived from lifecycle status
+    sowStatus: isActive ? "signed" : isSuspended ? "failed" : "sent",
+    connectStatus: isActive ? "verified" : "pending",
+    billingStatus: isActive ? "active" : "pending",
+    welcomeEmailStatus: sp.welcomeEmailSent ? "sent" : "pending",
+    systemAccessStatus: isActive ? "provisioned" : "locked",
+    // URLs
+    sowSigningUrl: sp.contractUrl,
+    connectOnboardingUrl: null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -180,8 +178,7 @@ function OnboardingForm({ onSuccess }) {
     setResult(null);
 
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const data = await deployOnboarding(form, token);
+      const data = await deploySPOnboarding(form);
 
       if (data.error && !data.record) {
         setError(data.error);
@@ -279,7 +276,7 @@ function OnboardingForm({ onSuccess }) {
               >
                 {TIERS.map((t) => (
                   <option key={t.id} value={t.id} className="bg-[#161a27] text-white">
-                    {t.label} \u2014 {t.desc}
+                    {t.label} — {t.desc}
                   </option>
                 ))}
               </select>
@@ -329,7 +326,7 @@ function OnboardingForm({ onSuccess }) {
               <span className="text-emerald-400 font-semibold text-sm">Onboarding Deployed</span>
             </div>
             <p className="text-white/60 text-xs">
-              {result.record?.spName} ({result.record?.spEmail}) \u2014 Clawbot is executing Legal, Financial, and System gates.
+              {result.record?.spName} ({result.record?.spEmail}) — Clawbot is executing Legal, Financial, and System gates.
               Monitor progress in the ledger below.
             </p>
           </motion.div>
@@ -367,9 +364,7 @@ function PipelineRow({ record, onRefresh }) {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      await refreshSPStatus(record.spEmail, token);
-      if (onRefresh) onRefresh();
+      if (onRefresh) await onRefresh();
     } catch {
       // Fail silently, ledger will re-poll
     } finally {
@@ -390,7 +385,7 @@ function PipelineRow({ record, onRefresh }) {
             <OverallBadge status={record.overallStatus} />
           </div>
           <p className="text-white/40 text-xs truncate">
-            {record.spEmail} \u00b7 {record.spPhone || "\u2014"} \u00b7 {record.tier?.toUpperCase() || "PILOT"}
+            {record.spEmail} · {record.spPhone || "\u2014"} · {record.tier?.toUpperCase() || "PILOT"}
           </p>
           <p className="text-white/30 text-[11px] mt-0.5">
             Initiated {fmtDate(record.initiatedAt)} {fmtTime(record.initiatedAt)} by {record.initiatedBy || "CEO"}
@@ -485,17 +480,16 @@ function OnboardingLedger({ refreshTick }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const data = await fetchPipeline(token);
-      if (data.pipeline) {
-        setPipeline(data.pipeline);
+      const data = await fetchSPLedger();
+      if (data.professionals) {
+        setPipeline(data.professionals.map(mapSPRecord));
         setError(null);
       } else if (data.error) {
         setError(data.error);
       }
       setLastRefresh(new Date());
     } catch (err) {
-      setError(err.message || "Failed to load pipeline");
+      setError(err.message || "Failed to fetch SP ledger");
     } finally {
       setLoading(false);
     }
@@ -531,7 +525,7 @@ function OnboardingLedger({ refreshTick }) {
           <div>
             <h3 className="text-white font-semibold text-lg">Onboarding Pipeline</h3>
             <p className="text-white/40 text-sm">
-              {pipeline.length} total \u00b7 {inProgress} in progress \u00b7 {complete} complete \u00b7 {failed} issues
+              {pipeline.length} total · {inProgress} in progress · {complete} complete · {failed} issues
             </p>
           </div>
         </div>
@@ -632,7 +626,7 @@ export function SPOnboardingContent() {
           <h2 className="text-xl font-bold text-white">SP Onboarding</h2>
         </div>
         <p className="text-white/40 text-sm ml-11">
-          Deploy and monitor Sovereign Professional onboarding \u2014 Legal, Financial, and System gates
+          Deploy and monitor Sovereign Professional onboarding — Legal, Financial, and System gates
         </p>
       </motion.div>
 

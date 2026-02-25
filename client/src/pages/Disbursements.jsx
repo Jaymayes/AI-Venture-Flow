@@ -17,13 +17,12 @@ import {
   UserCheck,
   Lock,
 } from "lucide-react";
+import { fetchDisbursements, approveDisbursement } from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
-// Constants — live endpoints only, no mock fallback
+// Constants
 // ---------------------------------------------------------------------------
 
-const DISBURSEMENT_API =
-  "https://moltbot-triage-engine.jamarr.workers.dev/api/disbursement";
 const POLL_INTERVAL = 30_000;
 
 const fadeUp = {
@@ -72,36 +71,72 @@ const w9Config = {
 };
 
 // ---------------------------------------------------------------------------
-// API Layer
+// Record Mapper — translates FinOps payout model to legacy UI shape
 // ---------------------------------------------------------------------------
 
-async function fetchDashboardLedger() {
-  const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-  const res = await fetch(`${DISBURSEMENT_API}/dashboard`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+const STATUS_MAP = {
+  pending_approval: "staged",
+  approved: "approved",
+  paid: "disbursed",
+};
+
+function mapPayoutToCommission(payout) {
+  const grossMarginDecimal = (payout.grossMarginPct ?? 0) / 100;
+  const isMarginHealthy = grossMarginDecimal >= 0.80;
+
+  return {
+    commissionId: payout.id,
+    spName: payout.spName,
+    spBusinessEntity: "",
+    status: STATUS_MAP[payout.status] || "staged",
+    w9Status: "verified",
+    deal: {
+      clientName: payout.clientName,
+      tcvUSD: payout.revenueAmount,
+      commissionUSD: payout.commissionAmount,
+      commissionPercent:
+        payout.revenueAmount > 0
+          ? Math.round((payout.commissionAmount / payout.revenueAmount) * 100)
+          : 0,
     },
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+    marginHealth: {
+      grossMargin: grossMarginDecimal,
+      cogsUSD: payout.cogs,
+    },
+    stagedAt: payout.createdAt,
+    disbursedAt: payout.status === "paid" ? payout.createdAt : null,
+    blockReason: !isMarginHealthy
+      ? `Gross margin ${(grossMarginDecimal * 100).toFixed(1)}% is below the 80% threshold`
+      : null,
+  };
 }
 
-async function executeCEOApproval(commissionId) {
-  const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-  const res = await fetch(`${DISBURSEMENT_API}/approve`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+function mapLedgerResponse(data) {
+  const commissions = (data.payouts ?? []).map(mapPayoutToCommission);
+
+  const pendingApproval = commissions.filter((c) => c.status === "staged");
+  const blocked = commissions.filter(
+    (c) => c.status === "staged" && c.blockReason
+  );
+  const clean = pendingApproval.filter((c) => !c.blockReason);
+  const recentlyDisbursed = commissions.filter(
+    (c) => c.status === "disbursed" || c.status === "approved"
+  );
+
+  const summary = data.summary ?? {};
+
+  return {
+    pendingApproval: clean,
+    blocked,
+    recentlyDisbursed,
+    totals: {
+      pendingAmountUSD: summary.pendingAmountUSD ?? 0,
+      pendingCount: summary.totalPending ?? 0,
+      blockedCount: blocked.length,
+      disbursedAmountLast30Days: summary.paidAmountUSD ?? 0,
+      disbursedLast30Days: summary.totalPaid ?? 0,
     },
-    body: JSON.stringify({ commissionId }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error ?? "Transfer failed");
-  }
-  return res.json();
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -310,25 +345,12 @@ function useDisbursementState() {
 
   const fetchData = useCallback(async () => {
     try {
-      const result = await fetchDashboardLedger();
-      setData(result);
+      const result = await fetchDisbursements();
+      setData(mapLedgerResponse(result));
       setError(null);
       setLastUpdated(new Date());
     } catch (err) {
-      setError(err.message);
-      // Enforce absolute zero-state — no mock padding
-      setData({
-        pendingApproval: [],
-        blocked: [],
-        recentlyDisbursed: [],
-        totals: {
-          pendingAmountUSD: 0,
-          pendingCount: 0,
-          blockedCount: 0,
-          disbursedAmountLast30Days: 0,
-          disbursedLast30Days: 0,
-        },
-      });
+      setError(err.message || "Failed to fetch disbursement ledger");
     } finally {
       setLoading(false);
     }
@@ -352,15 +374,15 @@ function useDisbursementState() {
 
   const confirmApproval = async () => {
     if (!confirmModal) return;
-    const commissionId = confirmModal.commissionId;
+    const payoutId = confirmModal.commissionId;
     setConfirmModal(null);
-    setApprovingId(commissionId);
+    setApprovingId(payoutId);
 
     try {
-      await executeCEOApproval(commissionId);
+      await approveDisbursement(payoutId);
       await fetchData();
     } catch (err) {
-      setError(`Transfer failed: ${err.message}`);
+      setError(`Approval failed: ${err.message}`);
     } finally {
       setApprovingId(null);
     }

@@ -7,6 +7,9 @@ import { DisbursementsContent } from "./Disbursements";
 import { SPOnboardingContent } from "./SPOnboarding";
 import { RevenueSalvageContent } from "./RevenueSalvage";
 import { SecOpsLedgerContent } from "./SecOpsLedger";
+import { ComplianceDashboardContent } from "./ComplianceDashboard";
+import { TeamDelegationContent } from "./TeamDelegation";
+import { getAnalytics } from "../lib/triage-client";
 import {
   ArrowLeft,
   Activity,
@@ -31,14 +34,19 @@ import {
   Ghost,
   Sparkles,
   Radio,
+  Megaphone,
+  Mail,
+  MessageSquare,
+  Linkedin,
+  Zap,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const FINOPS_URL =
-  "https://moltbot-triage-engine.jamarr.workers.dev/api/finops/metrics";
+const API_BASE = import.meta.env.VITE_TRIAGE_API_BASE || "https://moltbot-triage-engine.jamarr.workers.dev";
+const FINOPS_URL = `${API_BASE}/api/finops/metrics`;
 const POLL_INTERVAL = 30_000;
 
 const fadeUp = {
@@ -54,6 +62,7 @@ const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
 const fmt = (n) => (n ?? 0).toLocaleString();
 const fmtPct = (n) => `${((n ?? 0) * 100).toFixed(1)}%`;
 const fmtUSD = (n) => `$${(n ?? 0).toFixed(2)}`;
+const fmtNum = (n) => (n ?? 0).toLocaleString();
 
 const statusColors = {
   nominal: { bg: "bg-emerald-500/20", text: "text-emerald-400", dot: "bg-emerald-400" },
@@ -275,6 +284,10 @@ const ceoTabs = [
   { id: "sp-onboarding", label: "SP Onboarding", icon: UserPlus, color: "teal" },
   { id: "revenue-salvage", label: "Revenue Salvage", icon: Flame, color: "red" },
   { id: "secops", label: "SecOps Ledger", icon: ShieldAlert, color: "rose" },
+  { id: "compliance", label: "Compliance", icon: Lock, color: "indigo" },
+  { id: "delegation", label: "SP Teams", icon: Users, color: "cyan" },
+  { id: "campaign", label: "Campaign", icon: Megaphone, color: "blue", href: "/campaign" },
+  { id: "triage", label: "Triage", icon: Target, color: "pink", href: "/triage" },
 ];
 
 const colorMap = {
@@ -313,6 +326,21 @@ const colorMap = {
     idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
     icon: "text-rose-400",
   },
+  pink: {
+    active: "border-pink-400 text-pink-400 bg-pink-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-pink-400",
+  },
+  blue: {
+    active: "border-blue-400 text-blue-400 bg-blue-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-blue-400",
+  },
+  indigo: {
+    active: "border-indigo-400 text-indigo-400 bg-indigo-400/10",
+    idle: "border-transparent text-white/40 hover:text-white/70 hover:border-white/10",
+    icon: "text-indigo-400",
+  },
 };
 
 // ===========================================================================
@@ -325,6 +353,7 @@ export default function CEODashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [compressionData, setCompressionData] = useState({
     actionableTokenRatio: 0,
     atrTarget: 0.80,
@@ -356,7 +385,7 @@ export default function CEODashboard() {
     try {
       const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
       const res = await fetch(
-        "https://moltbot-triage-engine.jamarr.workers.dev/api/finops/compression-roi",
+        `${API_BASE}/api/finops/compression-roi`,
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (!res.ok) return;
@@ -378,12 +407,23 @@ export default function CEODashboard() {
     }
   };
 
+  const fetchAnalytics = async () => {
+    try {
+      const data = await getAnalytics();
+      setAnalytics(data);
+    } catch {
+      // Silent — God View is additive, not critical path
+    }
+  };
+
   useEffect(() => {
     fetchMetrics();
     fetchCompression();
+    fetchAnalytics();
     const id = setInterval(fetchMetrics, POLL_INTERVAL);
     const id2 = setInterval(fetchCompression, POLL_INTERVAL);
-    return () => { clearInterval(id); clearInterval(id2); };
+    const id3 = setInterval(fetchAnalytics, POLL_INTERVAL);
+    return () => { clearInterval(id); clearInterval(id2); clearInterval(id3); };
   }, []);
 
   const m = metrics ?? {};
@@ -391,6 +431,21 @@ export default function CEODashboard() {
   const sr = m.semanticRouting ?? {};
   const tv = m.triageVelocity ?? {};
   const sg = m.securityGovernance ?? {};
+  const an = analytics ?? {};
+  const pipeline = an.pipeline ?? {};
+  const roi = an.finops ?? {};
+  const channels = an.channels ?? {};
+
+  // ── Phase 12: Prefer live KV-sourced analytics over volatile in-memory metrics ──
+  const liveGrossMargin = roi.grossMargin24h ?? ue.currentGrossMargin ?? 0;
+  const liveCPL = roi.costPerLead24h ?? ue.averageCPL ?? 0;
+  const liveCOGS24h = roi.cogs24h ?? ue.cogs24h ?? 0;
+  const liveInputTokens = roi.inputTokens24h ?? ue.totalTokens24h?.input ?? 0;
+  const liveOutputTokens = roi.outputTokens24h ?? ue.totalTokens24h?.output ?? 0;
+  const liveExecCount = roi.executionCount24h ?? ue.executionCount ?? 0;
+  const livePhantom24h = roi.phantomTokensStripped24h ?? compressionData.phantomTokens24h;
+  const liveDefended24h = roi.defendedCapital24h ?? compressionData.defendedCapital24h;
+
   const overallStatus = m.status ?? "nominal";
   const sc = statusColors[overallStatus] ?? statusColors.nominal;
 
@@ -434,13 +489,24 @@ export default function CEODashboard() {
             {ceoTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const colors = colorMap[tab.color];
+              const cls = `flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition ${
+                isActive ? colors.active : colors.idle
+              }`;
+
+              if (tab.href) {
+                return (
+                  <Link key={tab.id} href={tab.href} className={cls}>
+                    <tab.icon size={15} className={colors.icon} />
+                    {tab.label}
+                  </Link>
+                );
+              }
+
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition ${
-                    isActive ? colors.active : colors.idle
-                  }`}
+                  className={cls}
                 >
                   <tab.icon size={15} className={isActive ? colors.icon : "text-white/30"} />
                   {tab.label}
@@ -458,6 +524,8 @@ export default function CEODashboard() {
       {activeTab === "sp-onboarding" && <SPOnboardingContent />}
       {activeTab === "revenue-salvage" && <RevenueSalvageContent />}
       {activeTab === "secops" && <SecOpsLedgerContent />}
+      {activeTab === "compliance" && <ComplianceDashboardContent />}
+      {activeTab === "delegation" && <TeamDelegationContent />}
 
       {activeTab === "dashboard" && (
       loading && !metrics ? (
@@ -491,7 +559,7 @@ export default function CEODashboard() {
 
             {/* refresh + timestamp */}
             <button
-              onClick={fetchMetrics}
+              onClick={() => { fetchMetrics(); fetchCompression(); fetchAnalytics(); }}
               className="rounded-lg border border-white/10 bg-white/5 p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
               title="Refresh now"
             >
@@ -535,7 +603,7 @@ export default function CEODashboard() {
           >
             <div className="text-xs text-white/40">Gross Margin</div>
             <GrossMarginGauge
-              current={ue.currentGrossMargin ?? 0}
+              current={liveGrossMargin}
               target={ue.targetGrossMargin ?? 0.8}
             />
             <div className="mt-2 text-center text-xs text-white/30">
@@ -546,21 +614,21 @@ export default function CEODashboard() {
           {/* CPL */}
           <Card
             label="Cost Per Lead"
-            value={fmtUSD(ue.averageCPL)}
+            value={fmtUSD(liveCPL)}
             sub="Ceiling: $50.00"
             icon={DollarSign}
-            iconColor={cplColor(ue.averageCPL ?? 0)}
+            iconColor={cplColor(liveCPL)}
           >
             <div className="mt-3">
-              <Bar value={ue.averageCPL ?? 0} max={60} threshold={50} color="from-emerald-400 to-emerald-600" />
+              <Bar value={liveCPL} max={60} threshold={50} color="from-emerald-400 to-emerald-600" />
             </div>
           </Card>
 
           {/* COGS 24h */}
           <Card
             label="COGS (24h)"
-            value={fmtUSD(ue.cogs24h)}
-            sub={`${ue.executionCount ?? 0} executions`}
+            value={fmtUSD(liveCOGS24h)}
+            sub={`LLM: $${(roi.llmInferenceCost24h ?? 0).toFixed(4)} · E2B: $${(roi.e2bScrapeCost24h ?? 0).toFixed(2)} · Vapi: $${(roi.vapiVoiceCost24h ?? 0).toFixed(2)}`}
             icon={Activity}
             iconColor="text-primary"
           />
@@ -575,20 +643,21 @@ export default function CEODashboard() {
         >
           <Card
             label="Input Tokens (24h)"
-            value={fmt(ue.totalTokens24h?.input)}
+            value={fmt(liveInputTokens)}
             icon={Cpu}
             iconColor="text-blue-400"
           />
           <Card
             label="Output Tokens (24h)"
-            value={fmt(ue.totalTokens24h?.output)}
+            value={fmt(liveOutputTokens)}
             sub="3-10x costlier than input"
             icon={Cpu}
             iconColor="text-purple-400"
           />
           <Card
             label="Executions (24h)"
-            value={fmt(ue.executionCount)}
+            value={fmt(liveExecCount)}
+            sub={`${roi.e2bScrapeCount24h ?? 0} scrapes · ${(roi.vapiVoiceMinutes24h ?? 0).toFixed(0)}m voice`}
             icon={Activity}
             iconColor="text-accent"
           />
@@ -699,7 +768,7 @@ export default function CEODashboard() {
                 <div>
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Last 24 Hours</p>
                   <p className="text-3xl font-bold text-violet-400">
-                    {compressionData.phantomTokens24h.toLocaleString()}
+                    {livePhantom24h.toLocaleString()}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">tokens eliminated</p>
                 </div>
@@ -730,10 +799,10 @@ export default function CEODashboard() {
                 <div>
                   <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Saved (24h)</p>
                   <p className="text-3xl font-bold text-accent">
-                    ${compressionData.defendedCapital24h.toFixed(2)}
+                    ${liveDefended24h.toFixed(2)}
                   </p>
                   <p className="text-white/20 text-[10px] mt-0.5">
-                    {compressionData.phantomTokens24h.toLocaleString()} tokens &times; ${(compressionData.inferenceRate * 1000000).toFixed(2)}/M
+                    {livePhantom24h.toLocaleString()} tokens &times; $0.645/M
                   </p>
                 </div>
                 <div className="border-t border-white/5 pt-4">
@@ -749,7 +818,7 @@ export default function CEODashboard() {
             </div>
             <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
-                Margin Floor: 80% &middot; Currently {fmtPct(ue.currentGrossMargin ?? 0)}
+                Margin Floor: 80% &middot; Currently {fmtPct(liveGrossMargin)}
               </p>
             </div>
           </motion.div>
@@ -901,6 +970,232 @@ export default function CEODashboard() {
             icon={RotateCcw}
             iconColor={sg.loopBreakersTripped24h > 0 ? "text-amber-400" : "text-emerald-400"}
           />
+        </motion.div>
+
+        {/* ================================================================ */}
+        {/* MODULE 5: Pipeline & ROI God View (Phase 7)                    */}
+        {/* ================================================================ */}
+        <Section
+          icon={Sparkles}
+          title="Pipeline & ROI God View"
+          subtitle="Live venture economics &middot; AI vs. Human SDR displacement"
+        />
+
+        {/* Panel 1: Pipeline Health */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={stagger}
+          className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+        >
+          <Card
+            label="Active Engagements"
+            value={fmt(pipeline.activeEngagements)}
+            sub={`${fmt(pipeline.statusBreakdown?.running ?? 0)} running · ${fmt(pipeline.statusBreakdown?.waiting_cooldown ?? 0)} cooling`}
+            icon={Activity}
+            iconColor="text-primary"
+          />
+          <Card
+            label="Human Takeovers"
+            value={fmt(pipeline.humanTakeovers)}
+            sub="AI muted — operator in control"
+            icon={Users}
+            iconColor="text-amber-400"
+          />
+          <Card
+            label="Pending Handoffs"
+            value={fmt(pipeline.pendingHandoffs)}
+            sub="Awaiting human review"
+            icon={Target}
+            iconColor="text-accent"
+          />
+          <Card
+            label="Total Leads"
+            value={fmt(pipeline.totalLeads)}
+            sub={`${fmt(pipeline.statusBreakdown?.ready_for_outreach ?? 0)} queued for outreach`}
+            icon={Zap}
+            iconColor="text-blue-400"
+          />
+        </motion.div>
+
+        {/* Panel 2: AI vs. Human SDR ROI */}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="glass noise mt-4 rounded-2xl p-5 border border-white/5"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <DollarSign size={18} className="text-emerald-400" />
+            <h3 className="text-white font-bold text-sm">AI vs. Human SDR — Cost Displacement</h3>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Cost comparison */}
+            <div className="space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-emerald-400/60 mb-1">
+                  AI Annual Cost (projected)
+                </div>
+                <div className="text-2xl font-bold text-emerald-400">
+                  {fmtUSD(roi.annualizedAiCost)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-red-400/60 mb-1">
+                  Human SDR Cost (displaced)
+                </div>
+                <div className="text-2xl font-bold text-red-400 line-through decoration-red-400/50">
+                  {fmtUSD(roi.humanSDRCostUSD || 110000)}
+                </div>
+              </div>
+            </div>
+
+            {/* Center: Displacement multiple */}
+            <div className="flex flex-col items-center justify-center">
+              <div className="text-4xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                {roi.displacementMultiple != null
+                  ? roi.displacementMultiple >= 1000
+                    ? `${Math.round(roi.displacementMultiple / 1000)}k`
+                    : fmt(roi.displacementMultiple)
+                  : "—"}&times;
+              </div>
+              <div className="text-xs text-white/40 mt-1">
+                cheaper than a human SDR
+              </div>
+              <div className="text-sm font-semibold text-emerald-400 mt-2">
+                {fmtUSD(roi.annualSavingsUSD)} saved/yr
+              </div>
+            </div>
+
+            {/* Right: COGS breakdown */}
+            <div className="space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/30 mb-1">
+                  Total AI COGS (to date)
+                </div>
+                <div className="text-lg font-bold text-white/80">
+                  ${roi.totalCOGS != null ? roi.totalCOGS.toFixed(4) : "0.0000"}
+                </div>
+                <div className="text-[10px] text-white/20">
+                  Inference: ${roi.totalAiCostUSD != null ? roi.totalAiCostUSD.toFixed(4) : "0"} · Infra: ${roi.totalInfraCostUSD != null ? roi.totalInfraCostUSD.toFixed(4) : "0"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/30 mb-1">
+                  Avg Gross Margin
+                </div>
+                <div className={`text-lg font-bold ${(roi.averageGrossMargin ?? 0) >= 0.80 ? "text-emerald-400" : "text-amber-400"}`}>
+                  {((roi.averageGrossMargin ?? 0) * 100).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cost displacement bar */}
+          <div className="mt-4 pt-3 border-t border-white/5">
+            <div className="flex items-center justify-between text-[10px] text-white/30 mb-1">
+              <span>AI COGS: ${roi.totalCOGS != null ? roi.totalCOGS.toFixed(4) : "0"}</span>
+              <span>Human SDR: $110,000/yr</span>
+            </div>
+            <div className="relative h-3 rounded-full bg-red-400/15 overflow-hidden">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 to-accent"
+                style={{
+                  width: `${Math.max(
+                    ((roi.annualizedAiCost ?? 0) / 110000) * 100,
+                    0.5
+                  )}%`,
+                  minWidth: "4px",
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-[10px]">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" /> AI
+              </span>
+              <span className="flex items-center gap-1 text-red-400/50">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-400/30" /> Human (displaced)
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Panel 3: Token Compression Pipeline ROI */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={stagger}
+          className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
+        >
+          <Card
+            label="Tokens Compressed"
+            value={fmtNum(roi.compressionTokensSaved)}
+            sub={`${fmtNum(roi.compressionCharsSaved)} characters eliminated`}
+            icon={Ghost}
+            iconColor="text-purple-400"
+          />
+          <Card
+            label="Compression Savings"
+            value={`$${roi.compressionCostSavingsUSD != null ? roi.compressionCostSavingsUSD.toFixed(4) : "0.0000"}`}
+            sub="Phantom tokens defended"
+            icon={ShieldCheck}
+            iconColor="text-emerald-400"
+          />
+        </motion.div>
+
+        {/* Panel 4: Channel Efficacy */}
+        <div className="mt-4 mb-2 flex items-center gap-2">
+          <Network size={16} className="text-primary opacity-70" />
+          <h3 className="text-sm font-bold text-white/70">Channel Efficacy</h3>
+        </div>
+
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={stagger}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+        >
+          {[
+            { key: "email", label: "Email", icon: Mail, color: "text-primary", barColor: "from-primary to-primary/70" },
+            { key: "sms", label: "SMS", icon: MessageSquare, color: "text-accent", barColor: "from-accent to-accent/70" },
+            { key: "linkedin_dm", label: "LinkedIn DM", icon: Linkedin, color: "text-blue-400", barColor: "from-blue-400 to-blue-400/70" },
+          ].map(({ key, label, icon: ChIcon, color, barColor }) => {
+            const ch = channels[key] ?? {};
+            const openPct = ((ch.openRate ?? 0) * 100).toFixed(0);
+            const replyPct = ((ch.replyRate ?? 0) * 100).toFixed(0);
+            return (
+              <motion.div
+                key={key}
+                variants={fadeUp}
+                className="glass noise rounded-2xl p-4 border border-white/5"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <ChIcon size={16} className={color} />
+                  <span className="text-sm font-bold text-white/80">{label}</span>
+                  <span className="ml-auto text-xs text-white/30 font-mono">
+                    {fmt(ch.attempts)} sent
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] mb-0.5">
+                      <span className="text-white/40">Open Rate</span>
+                      <span className={color}>{openPct}%</span>
+                    </div>
+                    <Bar value={ch.openRate ?? 0} max={1} color={barColor} />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] mb-0.5">
+                      <span className="text-white/40">Reply Rate</span>
+                      <span className={color}>{replyPct}%</span>
+                    </div>
+                    <Bar value={ch.replyRate ?? 0} max={1} color={barColor} />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </motion.div>
 
         {/* Footer */}
