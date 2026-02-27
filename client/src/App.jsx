@@ -19,6 +19,7 @@ import Disbursements from "./pages/Disbursements";
 import TriageLaunchpad from "./pages/TriageLaunchpad";
 import EngagementDetail from "./pages/EngagementDetail";
 import CampaignStudio from "./pages/CampaignStudio";
+import SPLaunchpad from "./pages/SPLaunchpad";
 import AuthGate from "./components/AuthGate";
 import SPGate from "./components/SPGate";
 import Portal from "./pages/Portal";
@@ -80,6 +81,8 @@ export default function App() {
           <Route path="/portal">
             <ProtectedRoute component={Portal} />
           </Route>
+          {/* ── SP Launchpad Dashboard (self-managed auth via AuthProvider) ── */}
+          <Route path="/launchpad" component={SPLaunchpad} />
           <Route path="/recruit" component={Recruit} />
           <Route path="/outreach" component={Outreach} />
           <Route path="/bqm" component={BQM} />
