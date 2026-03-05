@@ -14,12 +14,20 @@ import {
   Globe,
   Lock,
   ChevronRight,
+  ChevronDown,
   Menu,
   X,
   Send,
   Loader2,
+  Cpu,
+  TrendingUp,
+  Smartphone,
+  Brain,
+  CreditCard,
+  Banknote,
+  ArrowRight,
 } from "lucide-react";
-import { submitInboundLead } from "../lib/triage-client";
+import { submitIntakeLead } from "../lib/triage-client";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -53,6 +61,50 @@ const modules = [
     title: "Knowledge Ops",
     desc: "Enterprise knowledge management that indexes, summarizes, and retrieves information instantly from your entire document ecosystem.",
     tags: ["Document Indexing", "Smart Search", "Summarization"],
+  },
+];
+
+const antiZapierItems = [
+  {
+    icon: Zap,
+    title: "Kill the Middleware",
+    desc: "Stop paying $2,000/month for fragile Zapier chains that break every time your CRM updates. Our unified engine eliminates the middleware tax entirely.",
+    tags: ["No Zapier", "No Webhooks", "No Breakage"],
+  },
+  {
+    icon: Cpu,
+    title: "One Unified Engine",
+    desc: "CRM, billing, partner payouts, and AI sales development — all executing in one platform. No more reconciling five different SaaS tools.",
+    tags: ["Single Platform", "Closed Loop", "Real-time"],
+  },
+  {
+    icon: TrendingUp,
+    title: "Zero Overhead Scale",
+    desc: "Infinite scalability without infrastructure overhead. No servers to manage, no ops hires, no per-seat charges. Deploy in days, not months.",
+    tags: ["Edge-Native", "Pay-as-You-Go", "Instant Deploy"],
+  },
+];
+
+const financialLoopSteps = [
+  {
+    icon: Smartphone,
+    label: "DBC Lead Capture",
+    desc: "Prospect scans your Digital Business Card",
+  },
+  {
+    icon: Brain,
+    label: "AI Deal Room",
+    desc: "AI qualifies, drafts proposals, and manages the deal",
+  },
+  {
+    icon: CreditCard,
+    label: "Stripe Checkout",
+    desc: "Seamless payment collection with automated invoicing",
+  },
+  {
+    icon: Banknote,
+    label: "1-Click Payout",
+    desc: "Partner commissions calculated and disbursed instantly",
   },
 ];
 
@@ -101,15 +153,16 @@ const complianceItems = [
   },
 ];
 
-const navLinks = ["Modules", "Pricing", "Compliance"];
+const navLinks = ["Modules", "How It Works", "Pricing", "Compliance"];
 
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [leadForm, setLeadForm] = useState({ name: "", email: "", company: "", context: "" });
+  const [leadForm, setLeadForm] = useState({ name: "", email: "", company: "", title: "", context: "" });
   const [formStatus, setFormStatus] = useState("idle"); // idle | loading | success | error
 
   const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    const target = id.replace(/\s+/g, "").toLowerCase();
+    document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
     setMenuOpen(false);
   };
 
@@ -117,12 +170,12 @@ export default function Landing() {
     e.preventDefault();
     setFormStatus("loading");
     try {
-      await submitInboundLead({
-        source: "website",
-        prospectName: leadForm.name,
-        email: leadForm.email,
-        company: leadForm.company,
-        behavioralContext: leadForm.context || undefined,
+      await submitIntakeLead({
+        prospect_name: leadForm.name,
+        prospect_email: leadForm.email,
+        company_name: leadForm.company,
+        title: leadForm.title || undefined,
+        message: leadForm.context || undefined,
       });
       setFormStatus("success");
     } catch (err) {
@@ -169,25 +222,41 @@ export default function Landing() {
             <div className="flex items-center gap-1 pl-2 border-l border-white/10">
               <Lock size={12} className="text-white/20" />
             </div>
-            <Link
-              href="/ceo"
-              className="flex items-center gap-1.5 text-sm font-semibold text-emerald-400 transition hover:text-white"
-            >
-              <Shield size={14} /> CEO
-            </Link>
-            <Link
-              href="/playbook"
-              className="flex items-center gap-1.5 text-sm font-semibold text-amber-400 transition hover:text-white"
-            >
-              <BookOpen size={14} /> Playbook
-            </Link>
-
-            <Link
-              href="/recruit"
-              className="flex items-center gap-1.5 text-sm font-semibold text-accent transition hover:text-white"
-            >
-              <Zap size={14} /> Hiring
-            </Link>
+            {/* ── CEO / SP Dropdown ── */}
+            <div className="relative group">
+              <button className="flex items-center gap-1.5 text-sm font-semibold text-emerald-400 transition hover:text-white">
+                <Shield size={14} /> CEO / SP <ChevronDown size={12} className="opacity-50" />
+              </button>
+              <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute right-0 top-full pt-2 transition-all duration-150 z-50">
+                <div className="glass noise rounded-xl border border-white/10 py-2 min-w-[200px] shadow-xl">
+                  <Link
+                    href="/ceo"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Shield size={14} className="text-emerald-400" /> CEO Dashboard
+                  </Link>
+                  <Link
+                    href="/partner"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Users size={14} className="text-emerald-400/70" /> SP Command Center
+                  </Link>
+                  <div className="border-t border-white/5 my-1" />
+                  <Link
+                    href="/playbook"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <BookOpen size={14} className="text-amber-400" /> Sovereign Playbook
+                  </Link>
+                  <Link
+                    href="/recruit"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Zap size={14} className="text-accent" /> Hiring
+                  </Link>
+                </div>
+              </div>
+            </div>
             <button
               onClick={() => scrollTo("modules")}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-sm font-semibold text-black transition hover:opacity-90"
@@ -229,6 +298,7 @@ export default function Landing() {
               Dashboard
             </Link>
             <div className="border-t border-white/10 mt-2 pt-2">
+              <p className="text-[10px] uppercase tracking-widest text-white/20 px-1 pt-2 pb-1">Command Center</p>
               <Link
                 href="/ceo"
                 className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-emerald-400 hover:text-white"
@@ -236,10 +306,22 @@ export default function Landing() {
                 <Shield size={14} /> CEO Dashboard
               </Link>
               <Link
+                href="/partner"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-emerald-400/70 hover:text-white"
+              >
+                <Users size={14} /> SP Command Center
+              </Link>
+              <Link
                 href="/playbook"
                 className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-amber-400 hover:text-white"
               >
                 <BookOpen size={14} /> Sovereign Playbook
+              </Link>
+              <Link
+                href="/recruit"
+                className="flex items-center gap-2 w-full py-3 text-left text-sm font-semibold text-accent hover:text-white"
+              >
+                <Zap size={14} /> Hiring
               </Link>
             </div>
           </motion.div>
@@ -381,6 +463,187 @@ export default function Landing() {
             ))}
           </motion.div>
         </div>
+      </section>
+
+      {/* ══════════ HOW IT WORKS — ANTI-ZAPIER ══════════ */}
+      <section id="howitworks" className="relative z-10 px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={stagger}
+            className="mb-14 text-center"
+          >
+            <motion.span
+              variants={fadeUp}
+              className="mb-3 inline-block text-xs font-semibold uppercase tracking-widest text-accent"
+            >
+              Why Us
+            </motion.span>
+            <motion.h2
+              variants={fadeUp}
+              className="text-3xl font-bold md:text-4xl"
+            >
+              Your Agency Stack Is{" "}
+              <span className="gradient-text">Broken</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-white/50 max-w-2xl mx-auto">
+              Traditional agencies bolt together isolated SaaS tools using fragile webhooks and Zapier.
+              We replaced the entire stack with one unified engine.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={stagger}
+            className="grid gap-6 md:grid-cols-3"
+          >
+            {antiZapierItems.map((item) => (
+              <motion.div
+                key={item.title}
+                variants={fadeUp}
+                className="glass noise relative overflow-hidden rounded-2xl p-6 transition hover:border-white/20"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
+                  <item.icon size={24} className="text-accent" />
+                </div>
+                <h3 className="mb-2 text-xl font-bold">{item.title}</h3>
+                <p className="mb-4 text-sm leading-relaxed text-white/60">
+                  {item.desc}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {item.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/50"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ══════════ THE FINANCIAL LOOP ══════════ */}
+      <section className="relative z-10 px-6 py-24">
+        <div className="mx-auto max-w-5xl">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={stagger}
+            className="mb-14 text-center"
+          >
+            <motion.span
+              variants={fadeUp}
+              className="mb-3 inline-block text-xs font-semibold uppercase tracking-widest text-accent"
+            >
+              The Loop
+            </motion.span>
+            <motion.h2
+              variants={fadeUp}
+              className="text-3xl font-bold md:text-4xl"
+            >
+              From Lead to Paid in{" "}
+              <span className="gradient-text">Zero Clicks</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-white/50 max-w-2xl mx-auto">
+              We completely closed the financial loop. When a partner brings you a lead,
+              our AI qualifies them, collects payment, and calculates the commission dynamically.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={stagger}
+            className="glass noise rounded-2xl p-8 md:p-10"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 md:gap-0 items-center">
+              {financialLoopSteps.map((step, i) => (
+                <motion.div key={step.label} variants={fadeUp} className="contents">
+                  {/* Step */}
+                  <div className="flex flex-col items-center text-center md:col-span-1">
+                    <div
+                      className="flex h-16 w-16 items-center justify-center rounded-2xl mb-3 shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, rgba(109,92,255,0.2), rgba(0,229,160,0.2))`,
+                        border: `1px solid rgba(109,92,255,0.3)`,
+                      }}
+                    >
+                      <step.icon size={28} className="text-accent" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white mb-1">{step.label}</h4>
+                    <p className="text-[11px] text-white/40 leading-snug max-w-[140px]">
+                      {step.desc}
+                    </p>
+                  </div>
+
+                  {/* Arrow connector (hidden on mobile, hidden after last step) */}
+                  {i < financialLoopSteps.length - 1 && (
+                    <div className="hidden md:flex md:col-span-1 items-center justify-center">
+                      <ChevronRight size={24} className="text-accent/50" />
+                    </div>
+                  )}
+
+                  {/* Mobile arrow (visible only on mobile, hidden after last step) */}
+                  {i < financialLoopSteps.length - 1 && (
+                    <div className="flex md:hidden items-center justify-center py-1">
+                      <ArrowRight size={18} className="text-accent/40 rotate-90" />
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ══════════ JOIN THE PARTNER FLEET CTA ══════════ */}
+      <section className="relative z-10 px-6 py-24">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={stagger}
+          className="mx-auto max-w-3xl text-center"
+        >
+          <motion.div variants={fadeUp}>
+            <Users size={40} className="mx-auto mb-4 text-accent" />
+          </motion.div>
+          <motion.h2 variants={fadeUp} className="text-3xl font-bold md:text-4xl mb-4">
+            Scale Without the{" "}
+            <span className="gradient-text">Overhead</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="text-white/50 mb-8 max-w-lg mx-auto">
+            Join our partner fleet and hand out Digital Business Cards that convert.
+            Or let us power your agency's entire backend — from lead capture to payout.
+          </motion.p>
+          <motion.div
+            variants={fadeUp}
+            className="flex flex-wrap items-center justify-center gap-4"
+          >
+            <Link
+              href="/recruit"
+              className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
+            >
+              Join the Partner Fleet
+            </Link>
+            <Link
+              href="/c/jamarr"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 font-semibold text-white transition hover:bg-white/10"
+            >
+              See It Live <ChevronRight size={16} />
+            </Link>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* ══════════ PRICING ══════════ */}
@@ -589,6 +852,19 @@ export default function Landing() {
                       value={leadForm.company}
                       onChange={(e) => setLeadForm((f) => ({ ...f, company: e.target.value }))}
                       placeholder="Acme Corp"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lead-title" className="mb-1.5 block text-sm font-medium text-white/70">
+                      Title / Role
+                    </label>
+                    <input
+                      id="lead-title"
+                      type="text"
+                      value={leadForm.title}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder="VP of Engineering"
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
