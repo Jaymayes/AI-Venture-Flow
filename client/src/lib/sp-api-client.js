@@ -8,7 +8,7 @@
  * Features:
  *   - CORS mode: "cors" with JSON content type
  *   - Authorization: Bearer {token} injected from AuthContext
- *   - X-Caller-Role: SOVEREIGN_PROFESSIONAL header on every request
+ *   - X-Caller-Role: SP header on every request
  *   - Graceful 401/403 handling — returns { unauthorized: true } so the
  *     consuming component can call logout() and redirect to the auth gate
  *   - Network error isolation — throws descriptive errors
@@ -40,7 +40,7 @@ async function spFetch(token, method, path, body = null, extraHeaders = {}) {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      "X-Caller-Role": "SOVEREIGN_PROFESSIONAL",
+      "X-Caller-Role": "SP",
       ...extraHeaders,
     },
   };

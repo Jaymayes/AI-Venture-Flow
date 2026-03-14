@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getAuthToken } from "../lib/auth-store";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
@@ -31,7 +32,8 @@ import {
 // Live API — no mock fallback. Glass pane over bare metal.
 // ---------------------------------------------------------------------------
 
-const API_BASE = "https://moltbot-triage-engine.jamarr.workers.dev/api/outbound";
+const API_BASE = (import.meta.env.VITE_TRIAGE_API_BASE || "https://moltbot-triage-engine.jamarr.workers.dev") + "/api/outbound";
+// Phase 91: API_KEY removed — auth token sourced from auth-store
 
 // ---------------------------------------------------------------------------
 // Animation Variants
@@ -554,8 +556,10 @@ export default function Briefings() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const token = sessionStorage.getItem("ceo_token") || localStorage.getItem("ceo_token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = {
+        "Content-Type": "application/json",
+        ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      };
 
       const [statsRes, graphRes, triageRes] = await Promise.all([
         fetch(`${API_BASE}/bouncer-stats`, { headers }),

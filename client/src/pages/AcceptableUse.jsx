@@ -647,7 +647,7 @@ export default function AcceptableUse() {
                   <p className="font-semibold">Referral Service LLC</p>
                   <p>Attn: Compliance &amp; Abuse Team</p>
                   <p>Email: abuse@referralsvc.com</p>
-                  <p>Legal: legal@referralsvc.com</p>
+                  <p>Legal: support@referralsvc.com</p>
                   <p>Website: referralsvc.com</p>
                 </div>
               </section>

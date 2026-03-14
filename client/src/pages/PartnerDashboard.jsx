@@ -36,6 +36,9 @@ import {
   Link2,
   Copy,
   Mail,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   fetchPartnerLeads,
@@ -48,6 +51,9 @@ import {
 // ---------------------------------------------------------------------------
 
 const PARTNER_EMAIL_KEY = "rsllc_partner_email";
+const API_BASE =
+  import.meta.env.VITE_TRIAGE_API_BASE ||
+  "https://moltbot-triage-engine.jamarr.workers.dev";
 
 const STAGES = [
   { key: "qualified", label: "Qualified", color: "cyan", icon: Target },
@@ -799,31 +805,62 @@ function PartnerDashboardContent({ partnerEmail, onLogout }) {
 }
 
 // ---------------------------------------------------------------------------
-// Partner Auth Gate (PIN + Email)
+// Partner Auth Gate (Email + Password)
 // ---------------------------------------------------------------------------
 
 function PartnerAuthGate({ onAuthenticate }) {
   const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [showPin, setShowPin] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const SP_PIN = "PLAYBOOK2026";
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
       setError("Please enter a valid email address.");
       return;
     }
-    if (pin.trim() !== SP_PIN) {
-      setError("Invalid access code. Contact your team lead for credentials.");
-      setPin("");
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
-    // Store email for subsequent API calls
-    sessionStorage.setItem(PARTNER_EMAIL_KEY, email.trim());
-    onAuthenticate(email.trim());
+
+    // Phase 91: Backend-validated login (CEO or SP)
+    setLoading(true);
+    try {
+      // Try CEO login first
+      const ceoRes = await fetch(`${API_BASE}/api/auth/ceo-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      if (ceoRes.ok) {
+        sessionStorage.setItem(PARTNER_EMAIL_KEY, trimmedEmail);
+        onAuthenticate(trimmedEmail);
+        return;
+      }
+
+      // Not CEO — try SP login
+      const res = await fetch(`${API_BASE}/api/v1/auth/sp-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        sessionStorage.setItem(PARTNER_EMAIL_KEY, trimmedEmail);
+        onAuthenticate(trimmedEmail);
+      } else {
+        setError(data.error || "Invalid credentials.");
+        setPassword("");
+      }
+    } catch {
+      setError("Unable to connect. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -856,50 +893,46 @@ function PartnerAuthGate({ onAuthenticate }) {
 
         {/* Auth form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email */}
           <div>
             <label className="block text-sm font-semibold text-white/50 mb-2">
-              Partner Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError(null);
-              }}
-              placeholder="you@example.com"
-              autoFocus
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-sky-400/40 focus:ring-1 focus:ring-sky-400/20 transition-all"
-            />
-          </div>
-
-          {/* PIN */}
-          <div>
-            <label className="block text-sm font-semibold text-white/50 mb-2">
-              Access Code
+              Email Address
             </label>
             <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Mail size={16} className="text-white/30" />
+              </div>
               <input
-                type={showPin ? "text" : "password"}
-                value={pin}
-                onChange={(e) => {
-                  setPin(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Enter access code"
-                className="w-full px-4 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-sky-400/40 focus:ring-1 focus:ring-sky-400/20 transition-all"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                placeholder="you@example.com"
+                autoFocus
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-sky-400/40 focus:ring-1 focus:ring-sky-400/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white/50 mb-2">
+              Password
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Lock size={16} className="text-white/30" />
+              </div>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                placeholder="Enter password"
+                className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-sky-400/40 focus:ring-1 focus:ring-sky-400/20 transition-all"
               />
               <button
                 type="button"
-                onClick={() => setShowPin(!showPin)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showPin ? (
-                  <span className="text-xs">Hide</span>
-                ) : (
-                  <span className="text-xs">Show</span>
-                )}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -917,9 +950,10 @@ function PartnerAuthGate({ onAuthenticate }) {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Sign In
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : "Sign In"}
           </button>
         </form>
 

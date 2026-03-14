@@ -1,48 +1,88 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Lock, Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Shield, ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
 // ---------------------------------------------------------------------------
-// Partner Fleet Authentication Gate
+// Sovereign Professional Authentication Gate
 // ---------------------------------------------------------------------------
-// Simple client-side auth gate for the Partner Fleet Portal (/partner/:slug).
-// Stores the PIN value in sessionStorage so it can be sent as the
-// x-partner-pin header on API requests.
-//
-// This is NOT a security boundary — the real security is on the Worker API
-// (x-partner-pin header validation). This gate prevents casual unauthorized
-// access to the partner dashboard.
+// Email + password auth gate for the SP Fleet Portal (/partner/:slug).
+// CEO login validated via backend JWT endpoint (Phase 91).
+// SP email + password validated via API against business_cards table.
+// Stores the email in sessionStorage for API headers.
 // ---------------------------------------------------------------------------
 
-const AUTH_KEY = "rsllc_fleet_pin";
-const FLEET_PIN = "FLEET2026";
+const AUTH_KEY = "rsllc_fleet_email";
+
+const API_BASE =
+  import.meta.env.VITE_TRIAGE_API_BASE ||
+  "https://moltbot-triage-engine.jamarr.workers.dev";
 
 export default function FleetAuthGate({ children }) {
   const [authenticated, setAuthenticated] = useState(false);
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [showPin, setShowPin] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
   // Check sessionStorage on mount
   useEffect(() => {
     const stored = sessionStorage.getItem(AUTH_KEY);
-    if (stored === FLEET_PIN) {
+    if (stored && stored.includes("@")) {
       setAuthenticated(true);
     }
     setChecking(false);
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (pin.trim() === FLEET_PIN) {
-      sessionStorage.setItem(AUTH_KEY, pin.trim());
-      setAuthenticated(true);
-      setError(null);
-    } else {
-      setError("Invalid access code. Contact your account manager.");
-      setPin("");
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    // Phase 91: Backend-validated login (CEO or SP)
+    setLoading(true);
+    try {
+      // Try CEO login first
+      const ceoRes = await fetch(`${API_BASE}/api/auth/ceo-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      if (ceoRes.ok) {
+        sessionStorage.setItem(AUTH_KEY, trimmedEmail);
+        setAuthenticated(true);
+        setError(null);
+        return;
+      }
+
+      // Not CEO — try SP login
+      const res = await fetch(`${API_BASE}/api/v1/auth/sp-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        sessionStorage.setItem(AUTH_KEY, trimmedEmail);
+        setAuthenticated(true);
+        setError(null);
+      } else {
+        setError(data.error || "Invalid credentials.");
+        setPassword("");
+      }
+    } catch {
+      setError("Unable to connect. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,33 +119,54 @@ export default function FleetAuthGate({ children }) {
           Referral Service LLC — Sovereign Professional Portal
         </p>
 
-        {/* PIN form */}
+        {/* Login form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-white/50 mb-2">
-              Partner Access Code
+              Email Address
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Mail size={16} className="text-white/30" />
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                placeholder="you@example.com"
+                autoFocus
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-emerald-400/40 focus:ring-1 focus:ring-emerald-400/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white/50 mb-2">
+              Password
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2">
                 <Lock size={16} className="text-white/30" />
               </div>
               <input
-                type={showPin ? "text" : "password"}
-                value={pin}
+                type={showPassword ? "text" : "password"}
+                value={password}
                 onChange={(e) => {
-                  setPin(e.target.value);
+                  setPassword(e.target.value);
                   setError(null);
                 }}
-                placeholder="Enter access code"
-                autoFocus
+                placeholder="Enter password"
                 className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-emerald-400/40 focus:ring-1 focus:ring-emerald-400/20 transition-all"
               />
               <button
                 type="button"
-                onClick={() => setShowPin(!showPin)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -123,9 +184,16 @@ export default function FleetAuthGate({ children }) {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Authenticate
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Verifying...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </button>
         </form>
 

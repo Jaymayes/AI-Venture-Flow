@@ -33,10 +33,10 @@ export default function FleetPortal() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const pin = sessionStorage.getItem("rsllc_fleet_pin") || "";
+      const spEmail = sessionStorage.getItem("rsllc_fleet_email") || "";
       const res = await fetch(
         `${API_BASE}/api/v1/partners/${slug}/dashboard`,
-        { headers: { "x-partner-pin": pin } },
+        { headers: { "x-partner-email": spEmail } },
       );
       if (!res.ok) {
         if (res.status === 404) throw new Error("Card not found");

@@ -1,4 +1,4 @@
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import LeadDetail from "./pages/LeadDetail";
@@ -23,6 +23,15 @@ import SPLaunchpad from "./pages/SPLaunchpad";
 import AuthGate from "./components/AuthGate";
 import SPGate from "./components/SPGate";
 import Portal from "./pages/Portal";
+import SPCommandCenter from "./pages/SPCommandCenter";
+import DealRoom from "./pages/DealRoom";
+import DealView from "./pages/DealView";
+import KickoffPortal from "./pages/KickoffPortal";
+import ClientPortal from "./pages/ClientPortal";
+import CardView from "./pages/CardView";
+import CrmGateway from "./pages/CrmGateway";
+import SPPortal from "./pages/SPPortal";
+import SEOApproval from "./pages/SEOApproval";
 import ChatPanel from "./components/ChatPanel";
 import LegalFooter from "./components/LegalFooter";
 import "./index.css";
@@ -47,6 +56,10 @@ function SPProtectedRoute({ component: Component }) {
 }
 
 export default function App() {
+  // Detect DBC card routes — they have their own chat widget + no global chrome
+  const [, params] = window.location.pathname.match(/^\/c\/([^/]+)/) || [];
+  const isCardRoute = !!params;
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1">
@@ -81,6 +94,28 @@ export default function App() {
           <Route path="/portal">
             <ProtectedRoute component={Portal} />
           </Route>
+          {/* ── Epic 37: SEO Approval — CEO HITL gate for AI-generated content ── */}
+          <Route path="/seo-approval">
+            <ProtectedRoute component={SEOApproval} />
+          </Route>
+          {/* ── Epic 32: SP Portal — Sovereign Professional Command Dashboard ── */}
+          <Route path="/sp" component={SPPortal} />
+          {/* ── Phase 3: CRM Gateway — role-aware routing (CEO → monitoring, SP → operations) ── */}
+          <Route path="/crm" component={CrmGateway} />
+          {/* ── Phase 71: SP Command Center — consolidated dashboard ── */}
+          <Route path="/partner/:slug/dashboard"><Redirect to="/partner" /></Route>
+          <Route path="/partner/:slug"><Redirect to="/partner" /></Route>
+          <Route path="/partner" component={SPCommandCenter} />
+          {/* ── Phase 45: Deal Room Auto-Generator — public SOW page ── */}
+          <Route path="/deal/:id" component={DealView} />
+          {/* ── Phase 49: Kickoff Engine — post-purchase intake portal ── */}
+          <Route path="/kickoff/:id" component={KickoffPortal} />
+          {/* ── Phase 51: Client Portal — public project dashboard ── */}
+          <Route path="/portal/:id" component={ClientPortal} />
+          {/* ── Phase 24: Deal Room — public magic-link access (no auth) ── */}
+          <Route path="/deal-room/:token" component={DealRoom} />
+          {/* ── Phase 37: Digital Business Card — public AI-powered profile ── */}
+          <Route path="/c/:slug" component={CardView} />
           {/* ── SP Launchpad Dashboard (self-managed auth via AuthProvider) ── */}
           <Route path="/launchpad" component={SPLaunchpad} />
           <Route path="/recruit" component={Recruit} />
@@ -95,8 +130,8 @@ export default function App() {
           <Route path="/aup" component={AcceptableUse} />
         </Switch>
       </div>
-      <LegalFooter />
-      <ChatPanel />
+      {!isCardRoute && <LegalFooter />}
+      {!isCardRoute && <ChatPanel />}
     </div>
   );
 }

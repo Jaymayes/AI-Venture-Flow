@@ -24,13 +24,17 @@
  *   GET  /api/delegation/team         (Phase 7: List Sub-Contractors)
  *   GET  /api/delegation/metrics      (Phase 7: Sub-Contractor FinOps)
  *   GET  /api/delegation/me           (Phase 7: Sub-Contractor Profile)
+ *   GET  /api/tofu/pipeline           (Phase 19: ToFu Radar Pipeline)
+ *   POST /api/tofu/qualify            (Phase 19: ToFu Lead Qualification)
+ *   GET  /api/tofu/lead/:id           (Phase 19: ToFu Lead Detail)
  *
- * Authorization: Bearer token injected from VITE_ADMIN_API_KEY.
+ * Authorization: Bearer session JWT from auth-store (Phase 91).
  * Delegation endpoints also send X-Caller-Email (from VITE_CALLER_EMAIL).
  */
 
+import { getAuthToken } from './auth-store';
+
 const BASE = import.meta.env.VITE_TRIAGE_API_BASE || "";
-const API_KEY = import.meta.env.VITE_ADMIN_API_KEY || "";
 const CALLER_EMAIL = import.meta.env.VITE_CALLER_EMAIL || "";
 
 async function triageFetch(method, path, body, extraHeaders) {
@@ -38,24 +42,37 @@ async function triageFetch(method, path, body, extraHeaders) {
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${getAuthToken() || ""}`,
       ...(extraHeaders || {}),
     },
   };
   if (body) opts.body = JSON.stringify(body);
 
-  const res = await fetch(`${BASE}${path}`, opts);
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, opts);
+  } catch (networkErr) {
+    throw new Error(`Network error: ${networkErr.message}`);
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`${res.status} ${text}`);
   }
 
+  // Guard against non-JSON responses (HTML error pages, Cloudflare Access gates)
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `API Route Offline — expected JSON but received ${contentType || "unknown content-type"} from ${path}`
+    );
+  }
+
   return res.json();
 }
 
 /** Build delegation headers — injects X-Caller-Email and X-Caller-Role. */
-function delegationHeaders(role = "SOVEREIGN_PROFESSIONAL") {
+function delegationHeaders(role = "SP") {
   const headers = {};
   if (CALLER_EMAIL) headers["X-Caller-Email"] = CALLER_EMAIL;
   headers["X-Caller-Role"] = role;
@@ -130,9 +147,29 @@ export function approveDisbursement(id) {
   return triageFetch("POST", "/api/finops/approve", { id });
 }
 
-/** Fetch SecOps Ledger — returns stats + security intercept records. Phase 16. */
+/** Fetch Treasury Ledger — vendor payouts + owner draws. Phase 17. */
+export function fetchTreasuryLedger() {
+  return triageFetch("GET", "/api/finops/treasury");
+}
+
+/** CEO Approve & clear a treasury payout — HITL 1-click approval. Phase 17. */
+export function approveTreasuryPayout(id) {
+  return triageFetch("POST", "/api/finops/treasury/approve", { id });
+}
+
+/** Seed demo treasury payout tickets. Phase 17. */
+export function seedTreasuryData() {
+  return triageFetch("POST", "/api/finops/treasury/seed");
+}
+
+/** Fetch SecOps Ledger — returns stats + security intercept records. Phase 14/16. */
 export function fetchSecOpsLedger() {
   return triageFetch("GET", "/api/secops/ledger");
+}
+
+/** Simulate a SecOps threat — injects realistic AMOS/exfil payload for demos. Phase 14. */
+export function simulateSecOpsAttack() {
+  return triageFetch("POST", "/api/secops/simulate");
 }
 
 /** Fetch Salvage Kanban — 21-day burn-down board with all active deals. Phase 17. */
@@ -148,6 +185,11 @@ export function executeSalvageTakeover(id) {
 /** Seed demo salvage deals for the Kanban board. Phase 17. */
 export function seedSalvageData() {
   return triageFetch("POST", "/api/salvage/seed");
+}
+
+/** Execute Phase 16 salvage pipeline — autonomous churn interception. */
+export function executeSalvagePipeline(clientName, mrr, churnSignal) {
+  return triageFetch("POST", "/api/salvage/pipeline", { clientName, mrr, churnSignal });
 }
 
 /** Fetch compliance summary (OpenClaw posture). Phase 18. */
@@ -307,6 +349,127 @@ export function submitPartnerOnboard(payload) {
 // ---------------------------------------------------------------------------
 // Outbound Campaign Launcher — LinkedIn Enrichment via Apollo.io Scraper
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Phase 18: HITL Escalation Briefing — GLM-5 Full Context Packet
+// ---------------------------------------------------------------------------
+
+/** Fetch the GLM-5 escalation briefing for a high-intent prospect. Phase 18. */
+export function fetchEscalationBriefing(id) {
+  return triageFetch("GET", `/api/triage/briefing/${encodeURIComponent(id)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 19: ToFu Radar — Lead Qualification Pipeline
+// ---------------------------------------------------------------------------
+
+/** Fetch ToFu pipeline summary — stage counts, ARR, recent leads, funnel velocity. Phase 19. */
+export function fetchTofuPipeline() {
+  return triageFetch("GET", "/api/tofu/pipeline");
+}
+
+/** Score a single prospect through the ToFu Radar qualification engine. Phase 19. */
+export function qualifyProspect(prospect, conversationTurns, persist = false) {
+  return triageFetch("POST", "/api/tofu/qualify", {
+    prospect,
+    conversationTurns,
+    persist,
+  });
+}
+
+/** Get ToFu qualification detail for a specific lead by D1 ID. Phase 19. */
+export function fetchTofuLead(leadId) {
+  return triageFetch("GET", `/api/tofu/lead/${leadId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 20: SP Recruitment Pipeline — LangGraph State Machine
+// ---------------------------------------------------------------------------
+
+/** Run a candidate through the BQM → SOW → Financial recruitment graph. Phase 20. */
+export function qualifyCandidate(candidate) {
+  return triageFetch("POST", "/api/recruitment/qualify", { candidate });
+}
+
+/** CEO approves a recruitment execution from HITL interrupt. Phase 20. */
+export function approveRecruitment(executionId, ceoTierOverride, ceoNotes) {
+  return triageFetch("POST", "/api/recruitment/approve", {
+    executionId,
+    ...(ceoTierOverride ? { ceoTierOverride } : {}),
+    ...(ceoNotes ? { ceoNotes } : {}),
+  });
+}
+
+/** Fetch recruitment pipeline — list of all candidate executions. Phase 20. */
+export function fetchRecruitmentPipeline() {
+  return triageFetch("GET", "/api/recruitment/pipeline");
+}
+
+/** Fetch full recruitment execution state by ID. Phase 20. */
+export function fetchRecruitmentState(executionId) {
+  return triageFetch("GET", `/api/recruitment/state/${executionId}`);
+}
+
+// ── Phase 21: Escalation Protocol ──
+
+/** Trigger escalation dispatch for a qualified lead. */
+export function triggerEscalation(leadData) {
+  return triageFetch("POST", "/api/escalation/trigger", leadData);
+}
+
+/** Fetch the escalation pipeline (all dispatched leads). */
+export function fetchEscalationPipeline(limit = 50) {
+  return triageFetch("GET", `/api/escalation/pipeline?limit=${limit}`);
+}
+
+/** Fetch a specific escalation state by execution ID. */
+export function fetchEscalationState(executionId) {
+  return triageFetch("GET", `/api/escalation/state/${executionId}`);
+}
+
+// ── Phase 23: FinOps Ledger — Partner Payout Dashboard ──
+
+/** Fetch the FinOps payout ledger with summary KPIs. Phase 23. */
+export function fetchFinopsLedger() {
+  return triageFetch("GET", "/api/finops/ledger");
+}
+
+/** CEO approve a payout — marks as paid. Phase 23. */
+export function approveFinopsPayout(id) {
+  return triageFetch("POST", "/api/finops/ledger/approve", { id });
+}
+
+/** CEO release an escrow payout — triggers Stripe Transfer. Phase 33. */
+export function releaseEscrowPayout(id) {
+  return triageFetch("POST", `/api/finops/ledger/${id}/release-escrow`);
+}
+
+/**
+ * Submit an inbound lead to the public /api/intake webhook (Phase 25).
+ * No Bearer auth required — designed for cross-origin form submissions.
+ */
+export async function submitIntakeLead(payload) {
+  const res = await fetch(`${BASE}/api/intake`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Fetch global CEO analytics rollup (Phase 26). */
+export function fetchGlobalAnalytics() {
+  return triageFetch("GET", "/api/analytics/global");
+}
+
+/** Run Matrix Mode simulation — seeds CRM with 50 AI-scored leads + 15 closed deals. */
+export function runMatrixSimulation() {
+  return triageFetch("POST", "/api/simulate/seed");
+}
 
 /** Launch outbound enrichment for LinkedIn profiles (admin only, max 20). */
 export function launchOutboundCampaign(profiles) {

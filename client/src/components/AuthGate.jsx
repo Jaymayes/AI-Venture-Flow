@@ -1,48 +1,105 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Lock, Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
+import { setAuthToken } from "../lib/auth-store";
 
 // ---------------------------------------------------------------------------
-// CEO Authentication Gate
+// CEO Authentication Gate (Phase 91: Zero-Leak Auth)
 // ---------------------------------------------------------------------------
-// Simple client-side auth gate for protected pages (/ceo, /briefings).
-// Stores auth state in sessionStorage so the CEO stays authenticated
-// for the duration of the browser session without re-entering credentials.
+// Email + password auth gate for CEO-protected pages (/ceo, /triage, etc.).
+// Validates credentials via POST /api/auth/ceo-login (server-side).
+// Stores the session JWT in sessionStorage for cross-refresh persistence
+// and in the module-level auth-store for API client libraries.
 //
-// This is NOT a security boundary — the real security is on the Worker APIs
-// (Cloudflare Access JWT + service tokens). This gate prevents casual
-// unauthorized access to the frontend dashboards.
+// SECURITY: No hardcoded credentials. All validation is server-side.
+// The JWT is signed, time-limited (8h), and cryptographically verified.
 // ---------------------------------------------------------------------------
 
-const AUTH_KEY = "rsllc_ceo_auth";
-const CEO_PIN = "RSLLC2026";
+const AUTH_KEY = "rsllc_ceo_jwt";
+const API_BASE =
+  import.meta.env.VITE_TRIAGE_API_BASE ||
+  "https://moltbot-triage-engine.jamarr.workers.dev";
+
+/**
+ * Decode JWT payload without verification (for client-side exp check only).
+ * Actual signature verification happens server-side on every API call.
+ */
+function decodeJWTPayload(jwt) {
+  try {
+    const parts = jwt.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 export default function AuthGate({ children }) {
   const [authenticated, setAuthenticated] = useState(false);
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [showPin, setShowPin] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Check sessionStorage on mount
+  // Check sessionStorage for a valid (non-expired) JWT on mount
   useEffect(() => {
     const stored = sessionStorage.getItem(AUTH_KEY);
-    if (stored === "true") {
-      setAuthenticated(true);
+    if (stored) {
+      const payload = decodeJWTPayload(stored);
+      if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+        // JWT is still valid — restore session
+        setAuthToken(stored);
+        setAuthenticated(true);
+      } else {
+        // JWT expired — clear it
+        sessionStorage.removeItem(AUTH_KEY);
+      }
     }
     setChecking(false);
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (pin.trim() === CEO_PIN) {
-      sessionStorage.setItem(AUTH_KEY, "true");
-      setAuthenticated(true);
-      setError(null);
-    } else {
-      setError("Invalid access code. Contact your system administrator.");
-      setPin("");
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Password required.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/ceo-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.token) {
+        // Store JWT in memory + sessionStorage
+        setAuthToken(data.token);
+        sessionStorage.setItem(AUTH_KEY, data.token);
+        setAuthenticated(true);
+        setError(null);
+      } else {
+        setError(data.error || "Invalid credentials.");
+        setPassword("");
+      }
+    } catch {
+      setError("Unable to connect to authentication service.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -92,33 +149,56 @@ export default function AuthGate({ children }) {
           </div>
         </div>
 
-        {/* PIN form */}
+        {/* Login form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-white/50 mb-2">
-              Access Code
+              Email Address
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Mail size={16} className="text-white/30" />
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                placeholder="you@referralsvc.com"
+                autoFocus
+                disabled={loading}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white/50 mb-2">
+              Password
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2">
                 <Lock size={16} className="text-white/30" />
               </div>
               <input
-                type={showPin ? "text" : "password"}
-                value={pin}
+                type={showPassword ? "text" : "password"}
+                value={password}
                 onChange={(e) => {
-                  setPin(e.target.value);
+                  setPassword(e.target.value);
                   setError(null);
                 }}
-                placeholder="Enter access code"
-                autoFocus
-                className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all"
+                placeholder="Enter password"
+                disabled={loading}
+                className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all disabled:opacity-50"
               />
               <button
                 type="button"
-                onClick={() => setShowPin(!showPin)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -136,9 +216,10 @@ export default function AuthGate({ children }) {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            Authenticate
+            {loading ? "Authenticating..." : "Sign In"}
           </button>
         </form>
 

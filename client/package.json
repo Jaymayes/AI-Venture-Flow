@@ -10,11 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.4.2",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.563.0",
     "papaparse": "^5.5.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.7.0",
     "wouter": "^3.9.0"
   },
   "devDependencies": {

@@ -186,7 +186,7 @@ export default function PrivacyPolicy() {
                     <li>
                       <strong>Right to Opt Out:</strong> You may opt out of
                       automated decision-making by contacting us at
-                      privacy@referralsvc.com. Upon request, we will cease
+                      support@referralsvc.com. Upon request, we will cease
                       automated profiling and route your interactions to human
                       personnel only.
                     </li>
@@ -414,7 +414,7 @@ export default function PrivacyPolicy() {
                 <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4 text-white/80">
                   <p className="font-semibold">Referral Service LLC</p>
                   <p>Attn: Privacy Officer</p>
-                  <p>Email: privacy@referralsvc.com</p>
+                  <p>Email: support@referralsvc.com</p>
                   <p>Website: referralsvc.com</p>
                 </div>
               </section>

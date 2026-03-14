@@ -229,7 +229,7 @@ export default function CookiePolicy() {
                 <p className="mt-3">
                   You may opt out of Functional (AI Performance) cookies through
                   your browser settings or by contacting us at
-                  privacy@referralsvc.com. Opting out may affect the
+                  support@referralsvc.com. Opting out may affect the
                   personalization and relevance of AI-generated communications
                   but will not prevent you from using core Platform features.
                 </p>
@@ -281,7 +281,7 @@ export default function CookiePolicy() {
                   </li>
                   <li>
                     <strong>Opt-Out Request:</strong> Contact
-                    privacy@referralsvc.com to opt out of non-essential cookies.
+                    support@referralsvc.com to opt out of non-essential cookies.
                   </li>
                   <li>
                     <strong>Do Not Track:</strong> We honor Do Not Track (DNT)
@@ -317,7 +317,7 @@ export default function CookiePolicy() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/80">
                   <p className="font-semibold">Referral Service LLC</p>
                   <p>Attn: Privacy Officer</p>
-                  <p>Email: privacy@referralsvc.com</p>
+                  <p>Email: support@referralsvc.com</p>
                   <p>Website: referralsvc.com</p>
                 </div>
               </section>

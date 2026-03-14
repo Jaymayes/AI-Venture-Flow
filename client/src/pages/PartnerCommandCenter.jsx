@@ -51,10 +51,10 @@ export default function PartnerCommandCenter() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const pin = sessionStorage.getItem("rsllc_fleet_pin") || "";
+      const spEmail = sessionStorage.getItem("rsllc_fleet_email") || "";
       const res = await fetch(
         `${API_BASE}/api/v1/partners/${slug}/dashboard`,
-        { headers: { "x-partner-pin": pin } },
+        { headers: { "x-partner-email": spEmail } },
       );
       if (!res.ok) {
         if (res.status === 404) throw new Error("Partner not found");
@@ -78,10 +78,10 @@ export default function PartnerCommandCenter() {
   const fetchCampaign = useCallback(async () => {
     setCampaignLoading(true);
     try {
-      const pin = sessionStorage.getItem("rsllc_fleet_pin") || "";
+      const spEmail = sessionStorage.getItem("rsllc_fleet_email") || "";
       const res = await fetch(
         `${API_BASE}/api/v1/partners/${slug}/campaign`,
-        { headers: { "x-partner-pin": pin } },
+        { headers: { "x-partner-email": spEmail } },
       );
       if (res.ok) {
         const json = await res.json();

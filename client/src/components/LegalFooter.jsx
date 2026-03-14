@@ -29,8 +29,8 @@ const siteLinks = [
 
 const protectedLinks = [
   { href: "/ceo", label: "CEO Dashboard", color: "text-emerald-400/70 hover:text-emerald-400" },
+  { href: "/seo-approval", label: "SEO Approvals", color: "text-purple-400/70 hover:text-purple-400" },
   { href: "/playbook", label: "Sovereign Playbook", color: "text-amber-400/70 hover:text-amber-400" },
-  { href: "/portal", label: "CRM Portal", color: "text-sky-400/70 hover:text-sky-400" },
 ];
 
 export default function LegalFooter() {
@@ -118,8 +118,7 @@ export default function LegalFooter() {
               Contact
             </h4>
             <ul className="space-y-2.5 text-sm text-white/40">
-              <li>legal@referralsvc.com</li>
-              <li>privacy@referralsvc.com</li>
+              <li>support@referralsvc.com</li>
               <li>Phoenix, AZ</li>
             </ul>
           </div>

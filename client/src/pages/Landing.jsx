@@ -26,8 +26,10 @@ import {
   CreditCard,
   Banknote,
   ArrowRight,
+  Database,
 } from "lucide-react";
 import { submitIntakeLead } from "../lib/triage-client";
+import LeadMagnet from "../components/LeadMagnet";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -153,11 +155,11 @@ const complianceItems = [
   },
 ];
 
-const navLinks = ["Modules", "How It Works", "Pricing", "Compliance"];
+const navLinks = ["Audit", "Modules", "How It Works", "Pricing", "Compliance"];
 
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [leadForm, setLeadForm] = useState({ name: "", email: "", company: "", title: "", context: "" });
+  const [leadForm, setLeadForm] = useState({ name: "", email: "", company: "", title: "", context: "", phone: "", smsConsent: false });
   const [formStatus, setFormStatus] = useState("idle"); // idle | loading | success | error
 
   const scrollTo = (id) => {
@@ -176,6 +178,8 @@ export default function Landing() {
         company_name: leadForm.company,
         title: leadForm.title || undefined,
         message: leadForm.context || undefined,
+        phone: leadForm.phone || undefined,
+        sms_consent: leadForm.smsConsent,
       });
       setFormStatus("success");
     } catch (err) {
@@ -240,6 +244,12 @@ export default function Landing() {
                     className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
                   >
                     <Users size={14} className="text-emerald-400/70" /> SP Command Center
+                  </Link>
+                  <Link
+                    href="/crm"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Database size={14} className="text-cyan-400" /> CRM Portal
                   </Link>
                   <div className="border-t border-white/5 my-1" />
                   <Link
@@ -369,10 +379,10 @@ export default function Landing() {
             className="flex flex-wrap items-center justify-center gap-4"
           >
             <button
-              onClick={() => scrollTo("contact")}
+              onClick={() => scrollTo("audit")}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
-              Get a quote
+              Free SaaS Teardown
             </button>
             <button
               onClick={() => scrollTo("modules")}
@@ -401,6 +411,9 @@ export default function Landing() {
           </motion.div>
         </motion.div>
       </section>
+
+      {/* ══════════ LEAD MAGNET — FREE SAAS TEARDOWN ══════════ */}
+      <LeadMagnet />
 
       {/* ══════════ MODULES ══════════ */}
       <section id="modules" className="relative z-10 px-6 py-24">
@@ -881,6 +894,33 @@ export default function Landing() {
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30 resize-none"
                     />
                   </div>
+
+                  <div>
+                    <label htmlFor="lead-phone" className="mb-1.5 block text-sm font-medium text-white/70">
+                      Phone Number
+                    </label>
+                    <input
+                      id="lead-phone"
+                      type="tel"
+                      value={leadForm.phone}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={leadForm.smsConsent}
+                      onChange={(e) => setLeadForm((f) => ({ ...f, smsConsent: e.target.checked }))}
+                      className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5 text-primary accent-emerald-500 focus:ring-primary/30"
+                    />
+                    <span className="text-xs leading-relaxed text-white/50 group-hover:text-white/70 transition">
+                      I agree to receive SMS communications from Referral Service LLC regarding my application, deal status, and account updates. Msg &amp; Data rates may apply. Reply STOP to opt out at any time. View our{" "}
+                      <a href="/privacy" className="text-primary/70 underline hover:text-primary">Privacy Policy</a> and{" "}
+                      <a href="/terms" className="text-primary/70 underline hover:text-primary">Terms</a>.
+                    </span>
+                  </label>
 
                   {formStatus === "error" && (
                     <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">

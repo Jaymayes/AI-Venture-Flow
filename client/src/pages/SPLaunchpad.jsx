@@ -19,9 +19,11 @@ import { Link } from "wouter";
 import {
   ArrowLeft,
   Shield,
+  Mail,
   Lock,
   Eye,
   EyeOff,
+  Loader2,
   Rocket,
   Target,
   Activity,
@@ -44,21 +46,34 @@ const TABS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Auth Gate (PIN Entry UI)
+// Auth Gate (Email Entry UI)
 // ---------------------------------------------------------------------------
 
 function LaunchpadAuthGate() {
   const { login } = useAuth();
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [showPin, setShowPin] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = login(pin);
-    if (!success) {
-      setError("Invalid access code. Contact your team lead for credentials.");
-      setPin("");
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+    setLoading(true);
+    const result = await login(trimmed, password);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error || "Login failed.");
+      setPassword("");
     }
   };
 
@@ -103,38 +118,55 @@ function LaunchpadAuthGate() {
           </div>
         </div>
 
-        {/* PIN form */}
+        {/* Email form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-white/50 mb-2">
-              Access Code
+              Email Address
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Mail size={16} className="text-white/30" />
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                placeholder="you@example.com"
+                autoFocus
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white/50 mb-2">
+              Password
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2">
                 <Lock size={16} className="text-white/30" />
               </div>
               <input
-                type={showPin ? "text" : "password"}
-                value={pin}
-                onChange={(e) => {
-                  setPin(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Enter SP access code"
-                autoFocus
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                placeholder="Enter password"
                 className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
               />
               <button
                 type="button"
-                onClick={() => setShowPin(!showPin)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
               >
-                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          {/* Error */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -5 }}
@@ -147,9 +179,10 @@ function LaunchpadAuthGate() {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Authenticate
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : "Sign In"}
           </button>
         </form>
 

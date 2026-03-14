@@ -2,30 +2,30 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Flame,
-  DollarSign,
-  Clock,
-  AlertTriangle,
-  Skull,
-  TrendingDown,
-  TrendingUp,
-  Zap,
-  Shield,
   RefreshCw,
-  Loader2,
+  Zap,
+  ChevronDown,
   ChevronRight,
-  Eye,
-  Database,
+  AlertTriangle,
+  Clock,
+  DollarSign,
+  Users,
+  Shield,
+  Mail,
 } from "lucide-react";
-import {
-  fetchSalvageKanban,
-  executeSalvageTakeover,
-  seedSalvageData,
-} from "../lib/triage-client";
+import { fetchSalvageKanban } from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Phase 16: Revenue Salvage Engine — Autonomous Churn Interception Kanban
+//
+// Replaces the Phase 17 "Module in Development" placeholder.
+// 3-Column Kanban: At Risk (Triaging) | Drafting Strategy | Awaiting Approval
+// Reads from GET /api/salvage/kanban (legacy deals + Phase 16 tickets).
+//
+// Exports:
+//   RevenueSalvageContent — named export, embedded in CEODashboard.jsx "salvage" tab
+//   RevenueSalvage        — default export, standalone page route
 // ---------------------------------------------------------------------------
-const POLL_INTERVAL = 30_000;
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -33,468 +33,465 @@ const fadeUp = {
 };
 const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const fmtUSD = (n) =>
-  `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-
-const fmtDate = (iso) => {
-  if (!iso) return "\u2014";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-
-const fmtDelta = (d) => {
-  if (d == null) return "\u2014";
-  const sign = d >= 0 ? "+" : "";
-  return `${sign}${(d * 100).toFixed(0)}%`;
-};
-
-// Burn-Down zone classification
-function getZone(days) {
-  if (days <= 10) return "green";
-  if (days <= 17) return "amber";
-  return "red";
-}
-
-const zoneConfig = {
-  green: {
-    label: "Active (1\u201310d)",
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/20",
-    text: "text-emerald-400",
-    dot: "bg-emerald-400",
-    headerBg: "from-emerald-500/20 to-emerald-500/5",
-  },
-  amber: {
-    label: "At Risk (11\u201317d)",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/20",
-    text: "text-amber-400",
-    dot: "bg-amber-400",
-    headerBg: "from-amber-500/20 to-amber-500/5",
-  },
-  red: {
-    label: "Critical (18\u201321d+)",
-    bg: "bg-red-500/10",
-    border: "border-red-500/20",
-    text: "text-red-400",
-    dot: "bg-red-400",
-    headerBg: "from-red-500/20 to-red-500/5",
-  },
-};
-
-// Sentiment alert config
-const alertConfig = {
-  frustration_spike: {
-    label: "Frustration Spike",
+// ── Stage helpers ──
+const STAGE_CONFIG = {
+  triaging: {
+    label: "At Risk",
     color: "text-red-400",
-    bg: "bg-red-500/20",
-    icon: TrendingDown,
+    bg: "bg-red-500/10 border-red-500/20",
+    dot: "bg-red-500",
   },
-  disengagement: {
-    label: "Disengagement",
+  strategizing: {
+    label: "Drafting Strategy",
     color: "text-amber-400",
-    bg: "bg-amber-500/20",
-    icon: Clock,
+    bg: "bg-amber-500/10 border-amber-500/20",
+    dot: "bg-amber-500",
   },
-  churn_imminent: {
-    label: "Churn Imminent",
-    color: "text-red-400",
-    bg: "bg-red-500/15",
-    icon: Skull,
-    pulse: true,
+  awaiting_approval: {
+    label: "Awaiting Approval",
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10 border-emerald-500/20",
+    dot: "bg-emerald-500",
+  },
+  completed: {
+    label: "Completed",
+    color: "text-blue-400",
+    bg: "bg-blue-500/10 border-blue-500/20",
+    dot: "bg-blue-500",
+  },
+  abandoned: {
+    label: "Abandoned",
+    color: "text-white/30",
+    bg: "bg-white/5 border-white/10",
+    dot: "bg-white/30",
   },
 };
 
-// ---------------------------------------------------------------------------
-// Adapter: SalvageDeal (backend) → DealCard props (frontend)
-// ---------------------------------------------------------------------------
-
-const SENTIMENT_MAP = {
-  stable:   { score: 0.78, delta:  0.05, alert: null },
-  warning:  { score: 0.42, delta: -0.18, alert: "disengagement" },
-  critical: { score: 0.15, delta: -0.35, alert: "churn_imminent" },
-};
-
-function mapSalvageDeal(deal) {
-  const daysAgo = Math.max(
-    0,
-    Math.floor((Date.now() - deal.lastTouchAt) / (1000 * 60 * 60 * 24))
-  );
-  const sm = SENTIMENT_MAP[deal.sentiment] || SENTIMENT_MAP.stable;
-
-  // Derive alert based on zone — critical zone can also show frustration_spike
-  let sentimentAlert = sm.alert;
-  if (daysAgo >= 18 && deal.sentiment === "critical") {
-    sentimentAlert = "churn_imminent";
-  } else if (daysAgo >= 14 && deal.sentiment === "warning") {
-    sentimentAlert = "frustration_spike";
-  }
-
-  return {
-    id: deal.id,
-    prospectName: deal.clientName,
-    prospectCompany: `${deal.spName} Portfolio`,
-    spName: deal.spName,
-    tcv: deal.tcv,
-    daysSinceHandoff: daysAgo,
-    stage: deal.status,
-    sentimentScore: sm.score,
-    sentimentDelta: sm.delta,
-    lastContactAt: new Date(deal.lastTouchAt).toISOString(),
-    channel: "email",
-    sentimentAlert,
-  };
+function formatMRR(mrr) {
+  return `$${mrr.toLocaleString("en-US")}`;
 }
 
-// ---------------------------------------------------------------------------
-// Deal Card
-// ---------------------------------------------------------------------------
+function formatTCV(tcv) {
+  if (tcv >= 1000000) return `$${(tcv / 1000000).toFixed(1)}M`;
+  if (tcv >= 1000) return `$${(tcv / 1000).toFixed(0)}K`;
+  return `$${tcv.toLocaleString("en-US")}`;
+}
 
-function DealCard({ deal, onTakeover }) {
-  const zone = getZone(deal.daysSinceHandoff);
-  const zc = zoneConfig[zone];
-  const alert = deal.sentimentAlert ? alertConfig[deal.sentimentAlert] : null;
-  const AlertIcon = alert?.icon;
-  const [confirming, setConfirming] = useState(false);
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) return "< 1h ago";
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
-  const handleTakeover = () => {
-    if (!confirming) {
-      setConfirming(true);
-      setTimeout(() => setConfirming(false), 5000);
-      return;
-    }
-    if (onTakeover) onTakeover(deal.id);
-    setConfirming(false);
-  };
-
+// ── Stat Card ──
+function StatCard({ icon: Icon, label, value, color, iconColor }) {
   return (
     <motion.div
       variants={fadeUp}
-      className={`glass noise rounded-xl p-4 border ${zc.border} hover:border-white/20 transition-all relative overflow-hidden`}
+      className={`glass noise rounded-2xl p-4 border ${color}`}
     >
-      {/* Blinking overlay for red zone */}
-      {zone === "red" && (
-        <div className="absolute inset-0 bg-red-500/5 animate-pulse pointer-events-none" />
-      )}
-
-      {/* Header: Prospect + TCV */}
-      <div className="flex items-start justify-between mb-2 relative z-10">
-        <div className="flex-1 min-w-0">
-          <h4 className="text-white font-semibold text-sm truncate">{deal.prospectName}</h4>
-          <p className="text-white/40 text-xs truncate">{deal.prospectCompany}</p>
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl ${iconColor} flex items-center justify-center`}>
+          <Icon size={20} />
         </div>
-        <div className="text-right ml-3">
-          <p className={`text-sm font-bold ${zc.text}`}>{fmtUSD(deal.tcv)}</p>
-          <p className="text-white/30 text-[10px]">TCV</p>
+        <div>
+          <p className="text-2xl font-bold text-white">{value}</p>
+          <p className="text-white/40 text-xs">{label}</p>
         </div>
       </div>
-
-      {/* SP + Days counter */}
-      <div className="flex items-center justify-between mb-2 relative z-10">
-        <span className="text-white/50 text-xs">SP: {deal.spName}</span>
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${zc.bg} ${zc.text}`}>
-          <Clock size={10} />
-          Day {deal.daysSinceHandoff}
-        </span>
-      </div>
-
-      {/* Sentiment bar */}
-      <div className="mb-2 relative z-10">
-        <div className="flex items-center justify-between text-[10px] mb-1">
-          <span className="text-white/40">Sentiment</span>
-          <span className={deal.sentimentDelta >= 0 ? "text-emerald-400" : "text-red-400"}>
-            {fmtDelta(deal.sentimentDelta)}
-          </span>
-        </div>
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              deal.sentimentScore >= 0.6
-                ? "bg-emerald-400"
-                : deal.sentimentScore >= 0.3
-                  ? "bg-amber-400"
-                  : "bg-red-400"
-            }`}
-            style={{ width: `${Math.max(5, (deal.sentimentScore ?? 0) * 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Sentiment Alert Badge */}
-      {alert && (
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${alert.bg} mb-2 relative z-10 ${alert.pulse ? "animate-pulse" : ""}`}>
-          {AlertIcon && <AlertIcon size={12} className={alert.color} />}
-          <span className={`text-[11px] font-semibold ${alert.color}`}>
-            {alert.label} {deal.sentimentDelta != null && `\u0394 ${deal.sentimentDelta.toFixed(2)}`}
-          </span>
-        </div>
-      )}
-
-      {/* Last contact */}
-      <p className="text-white/20 text-[10px] mb-3 relative z-10">
-        Last contact: {fmtDate(deal.lastContactAt)} via {deal.channel?.toUpperCase()}
-      </p>
-
-      {/* Hostile Takeover button (only for amber/red) */}
-      {zone !== "green" && (
-        <button
-          onClick={handleTakeover}
-          className={`
-            w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all relative z-10
-            ${confirming
-              ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/30"
-              : "bg-gradient-to-r from-red-600/80 to-orange-600/80 hover:from-red-500 hover:to-orange-500 text-white/90 hover:text-white"
-            }
-          `}
-        >
-          {confirming ? (
-            <>
-              <Skull size={14} />
-              CONFIRM HOSTILE TAKEOVER
-            </>
-          ) : (
-            <>
-              <Flame size={14} />
-              Execute Takeover Protocol
-            </>
-          )}
-        </button>
-      )}
     </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Kanban Column
-// ---------------------------------------------------------------------------
-
-function KanbanColumn({ zone, deals, onTakeover }) {
-  const zc = zoneConfig[zone];
-  const totalTCV = deals.reduce((sum, d) => sum + (d.tcv ?? 0), 0);
+// ── Ticket Card ──
+function TicketCard({ ticket, isExpanded, onToggle }) {
+  const config = STAGE_CONFIG[ticket.stage] || STAGE_CONFIG.triaging;
+  const riskPct = Math.round((ticket.churnRisk || 0) * 100);
+  const salvagePct = Math.round((ticket.salvageProbability || 0) * 100);
 
   return (
-    <div className="flex-1 min-w-[280px]">
-      {/* Column Header */}
-      <div className={`glass noise rounded-t-xl p-3 border-b ${zc.border} bg-gradient-to-r ${zc.headerBg}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${zc.dot} ${zone === "red" ? "animate-pulse" : ""}`} />
-            <span className={`text-xs font-bold ${zc.text}`}>{zc.label}</span>
+    <motion.div
+      layout
+      variants={fadeUp}
+      className={`rounded-xl border ${config.bg} overflow-hidden`}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full text-left p-4 hover:bg-white/[0.02] transition group"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-white/20 group-hover:text-white/40 transition shrink-0">
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+            <h4 className="text-white font-semibold text-sm truncate">
+              {ticket.clientName}
+            </h4>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-white/40 text-[10px]">{deals.length} deals</span>
-            <span className={`text-xs font-semibold ${zc.text}`}>{fmtUSD(totalTCV)}</span>
-          </div>
+          <span className="flex items-center gap-1.5 shrink-0">
+            <span className={`w-2 h-2 rounded-full ${config.dot} animate-pulse`} />
+            <span className={`${config.color} text-[10px] font-bold uppercase`}>
+              {config.label}
+            </span>
+          </span>
         </div>
-      </div>
 
-      {/* Cards */}
-      <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-3 mt-3">
-        {deals.length === 0 && (
-          <div className="text-center py-8 text-white/20 text-xs">No deals in this zone</div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1 text-white/50">
+            <DollarSign size={11} />
+            <span className="font-mono">{formatMRR(ticket.mrr)}/mo</span>
+          </span>
+          <span className="flex items-center gap-1 text-red-400/70">
+            <AlertTriangle size={11} />
+            <span className="font-mono">{riskPct}%</span>
+          </span>
+          <span className="flex items-center gap-1 text-emerald-400/70">
+            <Shield size={11} />
+            <span className="font-mono">{salvagePct}%</span>
+          </span>
+          <span className="flex items-center gap-1 text-white/30 ml-auto">
+            <Clock size={11} />
+            <span>{timeAgo(ticket.createdAt)}</span>
+          </span>
+        </div>
+      </button>
+
+      {/* Expanded Details */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-3">
+              {/* Churn Signal */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle size={11} className="text-red-400" />
+                  <span className="text-red-400 text-[10px] font-bold uppercase tracking-wider">
+                    Churn Signal
+                  </span>
+                </div>
+                <p className="text-white/50 text-xs leading-relaxed">
+                  {ticket.churnSignal || "No signal captured"}
+                </p>
+              </div>
+
+              {/* Strategy (if available) */}
+              {ticket.strategy && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Zap size={11} className="text-amber-400" />
+                    <span className="text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                      AI Strategy
+                    </span>
+                  </div>
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    {ticket.strategy}
+                  </p>
+                </div>
+              )}
+
+              {/* Win-Back Draft (if available) */}
+              {ticket.winBackDraft && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Mail size={11} className="text-emerald-400" />
+                    <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                      Win-Back Draft
+                    </span>
+                  </div>
+                  <pre className="rounded-lg bg-black/40 border border-emerald-500/10 p-3 text-xs font-mono text-emerald-300/70 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                    {ticket.winBackDraft}
+                  </pre>
+                </div>
+              )}
+
+              {/* Meta */}
+              <div className="flex items-center gap-4 text-[10px] text-white/20 pt-1 border-t border-white/5">
+                <span>ID: {ticket.id?.substring(0, 8)}...</span>
+                <span>Triage: {ticket.triageModel || "pending"}</span>
+                <span>Strategy: {ticket.strategyModel || "pending"}</span>
+              </div>
+            </div>
+          </motion.div>
         )}
-        {deals.map((deal) => (
-          <DealCard key={deal.id} deal={deal} onTakeover={onTakeover} />
-        ))}
-      </motion.div>
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ── Kanban Column ──
+function KanbanColumn({ title, emoji, tickets, expandedId, setExpandedId, color, count }) {
+  return (
+    <div className="flex-1 min-w-[280px]">
+      <div className="flex items-center gap-2 mb-3 px-1">
+        <span className="text-lg">{emoji}</span>
+        <h3 className={`text-sm font-bold ${color}`}>{title}</h3>
+        <span className="ml-auto text-white/20 text-xs font-mono bg-white/5 rounded-full px-2 py-0.5">
+          {count}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {tickets.length === 0 ? (
+          <div className="text-center py-8 text-white/15 text-xs">
+            No tickets in this stage
+          </div>
+        ) : (
+          tickets.map((ticket) => (
+            <TicketCard
+              key={ticket.id}
+              ticket={ticket}
+              isExpanded={expandedId === ticket.id}
+              onToggle={() =>
+                setExpandedId(expandedId === ticket.id ? null : ticket.id)
+              }
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// RevenueSalvageContent (Named Export for CEO Tab)
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════
+// Named Export — CEO Dashboard tab embedding
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function RevenueSalvageContent() {
+  const [tickets, setTickets] = useState([]);
   const [deals, setDeals] = useState([]);
+  const [stats, setStats] = useState({
+    totalDeals: 0,
+    totalTCV: 0,
+    atRiskTCV: 0,
+    criticalDeals: 0,
+    activeTickets: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [seeding, setSeeding] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchDeals = useCallback(async () => {
+  const refresh = useCallback(async () => {
     try {
+      setRefreshing(true);
       const data = await fetchSalvageKanban();
-      const mapped = (data.deals ?? []).map(mapSalvageDeal);
-      setDeals(mapped);
-      setLastRefresh(new Date());
+      setTickets(data.tickets ?? []);
+      setDeals(data.deals ?? []);
+      setStats(data.stats ?? {
+        totalDeals: 0, totalTCV: 0, atRiskTCV: 0, criticalDeals: 0, activeTickets: 0,
+      });
       setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  const handleTakeover = useCallback(async (dealId) => {
-    try {
-      await executeSalvageTakeover(dealId);
-      await fetchDeals();
-    } catch (err) {
-      setError(`Takeover failed: ${err.message}`);
-    }
-  }, [fetchDeals]);
-
-  const handleSeed = useCallback(async () => {
-    setSeeding(true);
-    try {
-      await seedSalvageData();
-      await fetchDeals();
-    } catch (err) {
-      setError(`Seed failed: ${err.message}`);
-    } finally {
-      setSeeding(false);
-    }
-  }, [fetchDeals]);
-
   useEffect(() => {
-    fetchDeals();
-    const interval = setInterval(fetchDeals, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchDeals]);
+    refresh();
+  }, [refresh]);
 
-  // Bucket deals into zones
-  const greenDeals = deals.filter((d) => getZone(d.daysSinceHandoff) === "green");
-  const amberDeals = deals.filter((d) => getZone(d.daysSinceHandoff) === "amber");
-  const redDeals = deals.filter((d) => getZone(d.daysSinceHandoff) === "red");
-
-  // At-Risk TCV (amber + red)
-  const atRiskTCV = [...amberDeals, ...redDeals].reduce((sum, d) => sum + (d.tcv ?? 0), 0);
-  const totalTCV = deals.reduce((sum, d) => sum + (d.tcv ?? 0), 0);
-  const sentimentAlerts = deals.filter((d) => d.sentimentAlert).length;
+  // ── Partition tickets into Kanban columns ──
+  const triagingTickets = tickets.filter((t) => t.stage === "triaging");
+  const strategizingTickets = tickets.filter((t) => t.stage === "strategizing");
+  const awaitingTickets = tickets.filter((t) => t.stage === "awaiting_approval");
+  const completedTickets = tickets.filter((t) => t.stage === "completed");
+  const abandonedTickets = tickets.filter((t) => t.stage === "abandoned");
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6 p-6">
-      {/* Header */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={stagger}
+      className="space-y-6 p-6"
+    >
+      {/* ── Header ── */}
       <motion.div variants={fadeUp}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-              <Flame size={18} className="text-red-400" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <Flame size={22} className="text-red-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Revenue Salvage & Override Command</h2>
+              <h2 className="text-xl font-bold text-white">
+                Revenue Salvage Engine
+              </h2>
               <p className="text-white/40 text-sm">
-                21-Day Burn-Down Kanban · Intercept decaying TCV before churn
+                Autonomous Churn Interception &mdash; AI-Powered Win-Back Pipeline
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {lastRefresh && (
-              <span className="text-white/20 text-[11px]">
-                {lastRefresh.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              </span>
-            )}
-            <button
-              onClick={handleSeed}
-              disabled={seeding}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold transition-all disabled:opacity-40"
-            >
-              {seeding ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-              Seed Demo
-            </button>
-            <button
-              onClick={fetchDeals}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-red-400 transition-all"
-            >
-              <RefreshCw size={14} />
-            </button>
-          </div>
-        </div>
-      </motion.div>
 
-      {/* Stat Cards */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glass noise rounded-xl p-4 border border-white/10">
-          <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Total Pipeline TCV</p>
-          <p className="text-white text-2xl font-bold">{fmtUSD(totalTCV)}</p>
-          <p className="text-white/30 text-[10px] mt-1">{deals.length} active deals</p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-red-500/20 relative overflow-hidden">
-          <div className="absolute inset-0 bg-red-500/5 animate-pulse pointer-events-none" />
-          <p className="text-red-400 text-xs uppercase tracking-wider mb-1 relative z-10">At-Risk TCV</p>
-          <p className="text-red-400 text-2xl font-bold relative z-10">{fmtUSD(atRiskTCV)}</p>
-          <p className="text-red-400/50 text-[10px] mt-1 relative z-10">
-            {amberDeals.length + redDeals.length} deals in danger zone
-          </p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-amber-500/20">
-          <p className="text-amber-400 text-xs uppercase tracking-wider mb-1">Sentiment Alerts</p>
-          <p className="text-amber-400 text-2xl font-bold">{sentimentAlerts}</p>
-          <p className="text-white/30 text-[10px] mt-1">Active emergency overlays</p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-emerald-500/20">
-          <p className="text-emerald-400 text-xs uppercase tracking-wider mb-1">Safe Zone</p>
-          <p className="text-emerald-400 text-2xl font-bold">{greenDeals.length}</p>
-          <p className="text-white/30 text-[10px] mt-1">
-            {fmtUSD(greenDeals.reduce((s, d) => s + (d.tcv ?? 0), 0))} TCV protected
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Error Banner */}
-      {error && (
-        <motion.div variants={fadeUp} className="glass noise rounded-xl p-4 border border-red-500/30 bg-red-500/5">
           <div className="flex items-center gap-2">
-            <AlertTriangle size={14} className="text-red-400 shrink-0" />
-            <p className="text-red-400 text-sm">{error}</p>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="text-red-400 animate-spin" />
-          <span className="text-white/40 text-sm ml-3">Loading pipeline...</span>
-        </div>
-      )}
-
-      {/* 21-Day Kanban Board */}
-      {!loading && (
-        <motion.div variants={fadeUp} className="flex gap-4 overflow-x-auto pb-4">
-          <KanbanColumn zone="green" deals={greenDeals} onTakeover={handleTakeover} />
-          <KanbanColumn zone="amber" deals={amberDeals} onTakeover={handleTakeover} />
-          <KanbanColumn zone="red" deals={redDeals} onTakeover={handleTakeover} />
-        </motion.div>
-      )}
-
-      {/* Protocol Legend */}
-      <motion.div variants={fadeUp} className="glass noise rounded-xl p-4 border border-white/10">
-        <h4 className="text-white/60 text-xs font-bold uppercase tracking-wider mb-3">
-          Hostile Takeover Protocol — What Happens on Execute
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="flex items-start gap-2">
-            <Shield size={14} className="text-red-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="text-white/70 font-medium">IAM Revocation</span>
-              <p className="text-white/30">SP write-access downgraded to read-only</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <Zap size={14} className="text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="text-white/70 font-medium">SOW Generation</span>
-              <p className="text-white/30">$30K capped bi-weekly DocuSign envelope auto-sent</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <TrendingDown size={14} className="text-orange-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="text-white/70 font-medium">Drip Demotion</span>
-              <p className="text-white/30">SP demoted to 15% Override drip commission</p>
-            </div>
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white/60 text-xs font-medium hover:bg-white/10 hover:text-white transition disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+              Refresh
+            </button>
           </div>
         </div>
       </motion.div>
+
+      {/* ── Error Banner ── */}
+      {error && (
+        <motion.div
+          variants={fadeUp}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400"
+        >
+          {error}
+        </motion.div>
+      )}
+
+      {/* ── Stat Cards ── */}
+      <motion.div
+        variants={stagger}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <StatCard
+          icon={Users}
+          label="Active Tickets"
+          value={stats.activeTickets ?? 0}
+          color="border-red-500/20"
+          iconColor="bg-red-500/20 text-red-400"
+        />
+        <StatCard
+          icon={DollarSign}
+          label="MRR at Risk"
+          value={formatTCV(stats.atRiskTCV ?? 0)}
+          color="border-amber-500/20"
+          iconColor="bg-amber-500/20 text-amber-400"
+        />
+        <StatCard
+          icon={AlertTriangle}
+          label="Critical Deals"
+          value={stats.criticalDeals ?? 0}
+          color="border-orange-500/20"
+          iconColor="bg-orange-500/20 text-orange-400"
+        />
+        <StatCard
+          icon={Shield}
+          label="Pipeline Status"
+          value={stats.activeTickets > 0 ? "ACTIVE" : "IDLE"}
+          color="border-emerald-500/20"
+          iconColor="bg-emerald-500/20 text-emerald-400"
+        />
+      </motion.div>
+
+      {/* ── Kanban Board ── */}
+      {loading && tickets.length === 0 ? (
+        <motion.div variants={fadeUp} className="flex items-center justify-center py-16">
+          <RefreshCw size={24} className="animate-spin text-red-400/40" />
+          <span className="ml-3 text-white/30 text-sm">Loading salvage pipeline...</span>
+        </motion.div>
+      ) : tickets.length === 0 ? (
+        <motion.div variants={fadeUp} className="glass noise rounded-2xl border border-red-500/10 text-center py-16 px-6">
+          <Shield size={32} className="mx-auto text-red-400/30 mb-3" />
+          <p className="text-white/40 text-sm font-medium">No salvage tickets in pipeline</p>
+          <p className="text-white/20 text-xs mt-1">
+            Tickets are created automatically when churn signals are detected.
+          </p>
+        </motion.div>
+      ) : (
+        <motion.div variants={fadeUp}>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {/* Column 1: At Risk (Triaging) */}
+            <KanbanColumn
+              title="At Risk (Triaging)"
+              emoji={"\uD83D\uDEA8"}
+              tickets={triagingTickets}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              color="text-red-400"
+              count={triagingTickets.length}
+            />
+
+            {/* Column 2: Drafting Strategy */}
+            <KanbanColumn
+              title="Drafting Strategy"
+              emoji={"\u270D\uFE0F"}
+              tickets={strategizingTickets}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              color="text-amber-400"
+              count={strategizingTickets.length}
+            />
+
+            {/* Column 3: Awaiting Approval */}
+            <KanbanColumn
+              title="Awaiting Approval"
+              emoji={"\u23F3"}
+              tickets={awaitingTickets}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              color="text-emerald-400"
+              count={awaitingTickets.length}
+            />
+          </div>
+
+          {/* Completed / Abandoned rows below Kanban */}
+          {(completedTickets.length > 0 || abandonedTickets.length > 0) && (
+            <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+              {completedTickets.length > 0 && (
+                <KanbanColumn
+                  title="Completed"
+                  emoji={"\u2705"}
+                  tickets={completedTickets}
+                  expandedId={expandedId}
+                  setExpandedId={setExpandedId}
+                  color="text-blue-400"
+                  count={completedTickets.length}
+                />
+              )}
+              {abandonedTickets.length > 0 && (
+                <KanbanColumn
+                  title="Abandoned"
+                  emoji={"\u274C"}
+                  tickets={abandonedTickets}
+                  expandedId={expandedId}
+                  setExpandedId={setExpandedId}
+                  color="text-white/30"
+                  count={abandonedTickets.length}
+                />
+              )}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Footer ── */}
+      {tickets.length > 0 && (
+        <motion.div variants={fadeUp}>
+          <div className="flex items-center justify-between text-[10px] text-white/20 px-1">
+            <span>
+              {tickets.length} ticket{tickets.length !== 1 ? "s" : ""} in pipeline &middot;{" "}
+              {deals.length} legacy deal{deals.length !== 1 ? "s" : ""} tracked
+            </span>
+            <span>
+              Triage: Llama 3.1 8B &middot; Strategy: Z.AI GLM-5 &middot; Draft: Llama 3.1 8B
+            </span>
+          </div>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Default Export — Standalone page route
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function RevenueSalvage() {
   return (

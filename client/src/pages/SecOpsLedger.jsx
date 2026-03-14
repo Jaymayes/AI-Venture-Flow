@@ -2,29 +2,29 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldAlert,
-  ShieldBan,
-  ShieldCheck,
+  RefreshCw,
+  Zap,
+  ChevronDown,
+  ChevronRight,
+  Shield,
   Eye,
   AlertTriangle,
-  Ban,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  RefreshCw,
-  Loader2,
-  Skull,
-  Bug,
-  Code2,
-  FileWarning,
-  UserX,
-  Crown,
+  Activity,
+  XOctagon,
 } from "lucide-react";
-import { fetchSecOpsLedger } from "../lib/triage-client";
+import { fetchSecOpsLedger, simulateSecOpsAttack } from "../lib/triage-client";
 
 // ---------------------------------------------------------------------------
-// Constants
+// Phase 14: Zero-Trust SecOps War Room — Live Threat Visualization
+//
+// Replaces the Phase 13 "Module in Development" placeholder.
+// Reads immutable threat alerts from GET /api/secops/ledger.
+// Demo simulator injects realistic payloads via POST /api/secops/simulate.
+//
+// Exports:
+//   SecOpsLedgerContent  — named export, embedded in CEODashboard.jsx "secops" tab
+//   SecOpsLedger         — default export, standalone page route
 // ---------------------------------------------------------------------------
-const POLL_INTERVAL = 15_000; // Faster poll for security
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -32,445 +32,351 @@ const fadeUp = {
 };
 const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const fmtTime = (iso) => {
-  if (!iso) return "\u2014";
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
-};
-
-const fmtTimeAgo = (iso) => {
-  if (!iso) return "\u2014";
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-};
-
-// Verdict config
-const verdictConfig = {
-  BLOCKED: {
-    label: "BLOCKED",
-    color: "text-red-400",
-    bg: "bg-red-500/20",
-    border: "border-red-500/30",
-    icon: ShieldBan,
-  },
-  REVIEW: {
-    label: "REVIEW",
-    color: "text-amber-400",
-    bg: "bg-amber-500/20",
-    border: "border-amber-500/30",
-    icon: Eye,
-  },
-  ALLOWED: {
-    label: "ALLOWED",
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/20",
-    border: "border-emerald-500/30",
-    icon: ShieldCheck,
-  },
-};
-
-// Threat vector icons
-const vectorIcons = {
-  "Exfiltration Attempt": Bug,
-  "Credential Harvesting": Skull,
-  "Privilege Escalation": Crown,
-  "Supply Chain Injection": Code2,
-  "Suspicious Import": FileWarning,
-  "Suspicious Pattern": AlertTriangle,
-  None: ShieldCheck,
-};
-
-// Risk score color
-const riskColor = (score) => {
-  if (score >= 70) return "text-red-400";
-  if (score >= 40) return "text-amber-400";
-  return "text-emerald-400";
-};
-const riskBg = (score) => {
-  if (score >= 70) return "bg-red-400";
-  if (score >= 40) return "bg-amber-400";
-  return "bg-emerald-400";
-};
-
-// ---------------------------------------------------------------------------
-// Record Mapper — translates SecurityIntercept to legacy UI shape
-// ---------------------------------------------------------------------------
-
-const THREAT_LABELS = {
-  data_exfiltration: "Exfiltration Attempt",
-  remote_code_execution: "Privilege Escalation",
-  unauthorized_network: "Suspicious Pattern",
-  malicious_payload: "Supply Chain Injection",
-  privilege_escalation: "Privilege Escalation",
-  filesystem_access: "Suspicious Pattern",
-  supply_chain: "Supply Chain Injection",
-  steganography: "Suspicious Pattern",
-  scanner_crash: "Scanner Crash (Fail-Closed)",
-};
-
-function mapInterceptToFeed(intercept) {
-  const primaryThreat = intercept.threats?.[0] ?? "None";
-  const actionTaken = intercept.status === "quarantined" ? "REVIEW" : "BLOCKED";
-
-  return {
-    id: intercept.id,
-    timestamp: intercept.timestamp,
-    spId: intercept.actor?.split(" ")[0] ?? "AI",
-    spName: intercept.actor ?? "Autonomous Developer",
-    verdict: actionTaken,
-    riskScore: intercept.riskScore,
-    threatVector: THREAT_LABELS[primaryThreat] ?? "Suspicious Pattern",
-    skillName: intercept.skillName ?? intercept.id?.substring(0, 12),
-    deceptionAssessment: intercept.threats?.length > 0
-      ? `Detected ${intercept.threats.length} threat vector(s): ${intercept.threats.map(t => THREAT_LABELS[t] ?? t).join(", ")}. Code payload was ${intercept.status === "quarantined" ? "quarantined for CEO review" : "neutralized and blocked from execution"}.`
-      : "No specific threat vectors identified. Blocked by fail-closed security policy.",
-  };
+// ── Severity color helpers ──
+function riskColor(score) {
+  if (score >= 90) return "text-red-400";
+  if (score >= 70) return "text-orange-400";
+  if (score >= 50) return "text-amber-400";
+  return "text-yellow-400";
 }
 
-// ---------------------------------------------------------------------------
-// Threat Feed Item
-// ---------------------------------------------------------------------------
+function riskBg(score) {
+  if (score >= 90) return "bg-red-500/20 border-red-500/30";
+  if (score >= 70) return "bg-orange-500/20 border-orange-500/30";
+  if (score >= 50) return "bg-amber-500/20 border-amber-500/30";
+  return "bg-yellow-500/20 border-yellow-500/30";
+}
 
-function ThreatFeedItem({ scan }) {
-  const vc = verdictConfig[scan.verdict] ?? verdictConfig.BLOCKED;
-  const VerdictIcon = vc.icon;
-  const VectorIcon = vectorIcons[scan.threatVector] ?? AlertTriangle;
+function formatTimestamp(ts) {
+  const d = new Date(typeof ts === "number" ? ts : ts);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
 
+// ── Stat Card ──
+function StatCard({ icon: Icon, label, value, color, iconColor }) {
   return (
     <motion.div
       variants={fadeUp}
-      className={`glass noise rounded-xl p-4 border ${vc.border} transition-all hover:border-white/20`}
+      className={`glass noise rounded-2xl p-4 border ${color}`}
     >
-      <div className="flex items-start gap-3">
-        {/* Verdict icon */}
-        <div className={`w-8 h-8 rounded-lg ${vc.bg} flex items-center justify-center shrink-0 mt-0.5`}>
-          <VerdictIcon size={16} className={vc.color} />
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl ${iconColor} flex items-center justify-center`}>
+          <Icon size={20} />
         </div>
-
-        <div className="flex-1 min-w-0">
-          {/* Top row: verdict + timestamp */}
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold ${vc.color}`}>[{vc.label}]</span>
-              <span className="text-white/50 text-xs">{scan.spId}: {scan.spName}</span>
-            </div>
-            <span className="text-white/20 text-[10px]">{fmtTime(scan.timestamp)}</span>
-          </div>
-
-          {/* Threat vector + skill */}
-          <div className="flex items-center gap-2 mb-2">
-            <VectorIcon size={12} className={vc.color} />
-            <span className="text-white/70 text-xs font-medium">{scan.threatVector}</span>
-            <span className="text-white/20 text-[10px]">·</span>
-            <span className="text-white/30 text-xs font-mono">{scan.skillName}</span>
-          </div>
-
-          {/* Risk score bar */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-white/30 text-[10px] w-12">Risk</span>
-            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${riskBg(scan.riskScore)}`}
-                style={{ width: `${scan.riskScore}%` }}
-              />
-            </div>
-            <span className={`text-xs font-bold ${riskColor(scan.riskScore)} w-8 text-right`}>
-              {scan.riskScore}
-            </span>
-          </div>
-
-          {/* Deception Assessment */}
-          <p className="text-white/40 text-[11px] leading-relaxed">
-            <span className="text-white/50 font-medium">LLM Assessment: </span>
-            {scan.deceptionAssessment}
-          </p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Quarantine Queue (Review items with action buttons)
-// ---------------------------------------------------------------------------
-
-function QuarantineItem({ scan, onApprove, onBlock }) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      className="glass noise rounded-xl p-4 border border-amber-500/20 hover:border-amber-500/40 transition-all"
-    >
-      <div className="flex items-start justify-between mb-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Eye size={14} className="text-amber-400" />
-            <span className="text-white font-semibold text-sm">{scan.skillName}</span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${riskColor(scan.riskScore)} bg-white/5`}>
-              Risk {scan.riskScore}
-            </span>
-          </div>
-          <p className="text-white/40 text-xs">
-            {scan.spId} · {scan.spName} · {scan.threatVector}
-          </p>
+          <p className="text-2xl font-bold text-white">{value}</p>
+          <p className="text-white/40 text-xs">{label}</p>
         </div>
-        <span className="text-white/20 text-[10px]">{fmtTimeAgo(scan.timestamp)}</span>
-      </div>
-
-      {/* LLM Deception Assessment */}
-      <div className="glass rounded-lg p-3 mb-3 border border-white/5">
-        <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1 font-bold">Deception Assessment</p>
-        <p className="text-white/60 text-xs leading-relaxed">{scan.deceptionAssessment}</p>
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => onApprove?.(scan.id)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-xs font-bold transition-all border border-emerald-500/20"
-        >
-          <CheckCircle2 size={14} />
-          APPROVE & ALLOWLIST
-        </button>
-        <button
-          onClick={() => onBlock?.(scan.id)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-bold transition-all border border-red-500/20"
-        >
-          <Ban size={14} />
-          HARD BLOCK
-        </button>
       </div>
     </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SP Liability Index
-// ---------------------------------------------------------------------------
-
-function LiabilityRow({ sp, onRevoke }) {
-  const isHighRisk = sp.blocksThisWeek >= 3;
-  const statusColors = {
-    flagged: { bg: "bg-red-500/20", text: "text-red-400", dot: "bg-red-400" },
-    warning: { bg: "bg-amber-500/20", text: "text-amber-400", dot: "bg-amber-400" },
-    clean: { bg: "bg-emerald-500/20", text: "text-emerald-400", dot: "bg-emerald-400" },
-  };
-  const sc = statusColors[sp.status] ?? statusColors.clean;
-
+// ── Threat Row ──
+function ThreatRow({ alert, isExpanded, onToggle }) {
   return (
-    <motion.div
-      variants={fadeUp}
-      className={`glass noise rounded-xl p-4 border ${isHighRisk ? "border-red-500/30" : "border-white/10"} flex items-center justify-between gap-4 transition-all hover:border-white/20`}
-    >
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className={`w-8 h-8 rounded-lg ${sc.bg} flex items-center justify-center shrink-0`}>
-          <span className={`text-xs font-bold ${sc.text}`}>#{sp.spId.split("-")[1]}</span>
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-white font-semibold text-sm truncate">{sp.spName}</span>
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${sc.bg} ${sc.text}`}>
-              <span className={`w-1 h-1 rounded-full ${sc.dot}`} />
-              {sp.status.toUpperCase()}
+    <div className="border-b border-white/5 last:border-b-0">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.02] transition group"
+      >
+        {/* Expand indicator */}
+        <span className="text-white/20 group-hover:text-white/40 transition shrink-0">
+          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+
+        {/* Timestamp */}
+        <span className="text-white/50 text-xs font-mono w-40 shrink-0">
+          {formatTimestamp(alert.timestamp)}
+        </span>
+
+        {/* Threat Vectors */}
+        <span className="flex-1 flex flex-wrap gap-1 min-w-0">
+          {(alert.threatTypes || []).map((t, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap"
+            >
+              {t.replace(/^BEHAVIOR_/, "")}
             </span>
-          </div>
-          <p className="text-white/30 text-xs">
-            {sp.blocksTotal} total blocks · Last: {fmtTimeAgo(sp.lastBlockAt)}
-          </p>
-        </div>
-      </div>
+          ))}
+        </span>
 
-      {/* Weekly blocks counter */}
-      <div className="text-center px-3">
-        <div className={`text-xl font-bold ${isHighRisk ? "text-red-400" : sp.blocksThisWeek > 0 ? "text-amber-400" : "text-white/30"}`}>
-          {sp.blocksThisWeek}
-        </div>
-        <div className="text-[10px] text-white/30">this week</div>
-      </div>
+        {/* Risk Score */}
+        <span className={`text-sm font-bold tabular-nums w-12 text-right shrink-0 ${riskColor(alert.riskScore)}`}>
+          {alert.riskScore}
+        </span>
 
-      {/* Revoke button (only for >= 3 flags) */}
-      {isHighRisk && (
-        <button
-          onClick={() => onRevoke?.(sp.spId)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-bold transition-all border border-red-500/20 shrink-0"
-        >
-          <UserX size={14} />
-          Revoke Access
-        </button>
-      )}
-    </motion.div>
+        {/* Status */}
+        <span className="flex items-center gap-1.5 w-24 shrink-0 justify-end">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-red-400 text-xs font-bold">BLOCKED</span>
+        </span>
+      </button>
+
+      {/* Expanded: Inspect Payload */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Eye size={12} className="text-rose-400" />
+                <span className="text-rose-400 text-[10px] font-bold uppercase tracking-wider">
+                  Malicious Payload — Intercepted by AST Scanner
+                </span>
+              </div>
+              <pre className="rounded-xl bg-black/60 border border-rose-500/20 p-4 text-xs font-mono text-rose-300/80 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                {alert.maliciousSnippet || "// [payload data not available]"}
+              </pre>
+              <div className="mt-2 flex items-center gap-4 text-[10px] text-white/30">
+                <span>ID: {alert.id}</span>
+                <span>Risk: {alert.riskScore}/100</span>
+                <span>Vectors: {(alert.threatTypes || []).length}</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SecOpsLedgerContent (Named Export for CEO Tab)
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════
+// Named Export — CEO Dashboard tab embedding
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function SecOpsLedgerContent() {
-  const [threatFeed, setThreatFeed] = useState([]);
-  const [liability, setLiability] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [stats, setStats] = useState({
+    threatsBlocked: 0,
+    inQuarantine: 0,
+    avgRiskScore: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(null);
+  const [error, setError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [simulating, setSimulating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const refresh = useCallback(async () => {
     try {
+      setRefreshing(true);
       const data = await fetchSecOpsLedger();
-      const feed = (data.intercepts ?? []).map(mapInterceptToFeed);
-      setThreatFeed(feed);
-      setLiability([]); // SP Liability Index — not tracked per-SP in MVP
-      setLastRefresh(new Date());
+      // Phase 14 alerts take priority; fall back to legacy intercepts mapped to alert shape
+      const p14Alerts = data.alerts ?? [];
+      const legacyAlerts = (data.intercepts ?? []).map((ic) => ({
+        id: ic.id,
+        timestamp: new Date(ic.timestamp).getTime(),
+        threatTypes: ic.threats ?? [],
+        riskScore: ic.riskScore ?? 0,
+        maliciousSnippet: ic.rawPayload ?? "",
+        action: "BLOCKED",
+      }));
+      const merged = [...p14Alerts, ...legacyAlerts].sort(
+        (a, b) => b.timestamp - a.timestamp
+      );
+      setAlerts(merged);
+      setStats(data.stats ?? { threatsBlocked: 0, inQuarantine: 0, avgRiskScore: 0 });
+      setError(null);
     } catch (err) {
-      setThreatFeed([]);
-      setLiability([]);
+      setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    refresh();
+  }, [refresh]);
 
-  // Derived stats
-  const blockedCount = threatFeed.filter((s) => s.verdict === "BLOCKED").length;
-  const reviewCount = threatFeed.filter((s) => s.verdict === "REVIEW").length;
-  const quarantineItems = threatFeed.filter((s) => s.verdict === "REVIEW");
-  const highRiskSPs = liability.filter((sp) => sp.blocksThisWeek >= 3).length;
-  const avgRiskScore =
-    threatFeed.length > 0
-      ? Math.round(threatFeed.reduce((sum, s) => sum + s.riskScore, 0) / threatFeed.length)
-      : 0;
+  const handleSimulate = async () => {
+    setSimulating(true);
+    try {
+      await simulateSecOpsAttack();
+      // Small delay for KV propagation, then refresh
+      await new Promise((r) => setTimeout(r, 400));
+      await refresh();
+    } catch (err) {
+      setError(`Simulation failed: ${err.message}`);
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6 p-6">
-      {/* Header */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={stagger}
+      className="space-y-6 p-6"
+    >
+      {/* ── Header ── */}
       <motion.div variants={fadeUp}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
-              <ShieldAlert size={18} className="text-rose-400" />
+            <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+              <ShieldAlert size={22} className="text-rose-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Zero-Trust SecOps & Shadow AI Ledger</h2>
+              <h2 className="text-xl font-bold text-white">
+                Zero-Trust SecOps War Room
+              </h2>
               <p className="text-white/40 text-sm">
-                AST Scanner Intercepts · SP Liability Index · Quarantine Queue
+                32-Point AST Scanner Intercepts &mdash; Immutable Threat Ledger
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {lastRefresh && (
-              <span className="text-white/20 text-[11px]">
-                {lastRefresh.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              </span>
-            )}
+
+          <div className="flex items-center gap-2">
             <button
-              onClick={fetchData}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-rose-400 transition-all"
+              onClick={refresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white/60 text-xs font-medium hover:bg-white/10 hover:text-white transition disabled:opacity-50"
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+              Refresh
+            </button>
+            <button
+              onClick={handleSimulate}
+              disabled={simulating}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold hover:bg-rose-500/30 transition disabled:opacity-50"
+            >
+              <Zap size={13} className={simulating ? "animate-pulse" : ""} />
+              {simulating ? "Injecting..." : "Simulate Attack"}
             </button>
           </div>
         </div>
       </motion.div>
 
-      {/* Stat Cards */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glass noise rounded-xl p-4 border border-red-500/20">
-          <p className="text-red-400 text-xs uppercase tracking-wider mb-1">Threats Blocked</p>
-          <p className="text-red-400 text-2xl font-bold">{blockedCount}</p>
-          <p className="text-white/30 text-[10px] mt-1">Payloads neutralized</p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-amber-500/20">
-          <p className="text-amber-400 text-xs uppercase tracking-wider mb-1">In Quarantine</p>
-          <p className="text-amber-400 text-2xl font-bold">{reviewCount}</p>
-          <p className="text-white/30 text-[10px] mt-1">Awaiting CEO review</p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-rose-500/20">
-          <p className="text-rose-400 text-xs uppercase tracking-wider mb-1">High-Risk SPs</p>
-          <p className="text-rose-400 text-2xl font-bold">{highRiskSPs}</p>
-          <p className="text-white/30 text-[10px] mt-1">&ge;3 flags this week</p>
-        </div>
-        <div className="glass noise rounded-xl p-4 border border-white/10">
-          <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Avg Risk Score</p>
-          <p className={`text-2xl font-bold ${riskColor(avgRiskScore)}`}>{avgRiskScore}</p>
-          <p className="text-white/30 text-[10px] mt-1">Across all scans</p>
-        </div>
-      </motion.div>
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="text-rose-400 animate-spin" />
-          <span className="text-white/40 text-sm ml-3">Loading threat intelligence...</span>
-        </div>
-      )}
-
-      {!loading && (
-        <div className="grid gap-6 lg:grid-cols-5">
-          {/* Left Column: Threat Feed (3 cols) */}
-          <motion.div variants={fadeUp} className="lg:col-span-3 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldBan size={16} className="text-red-400" />
-              <h3 className="text-white font-bold text-sm">Live Threat Intercept Feed</h3>
-              <span className="text-white/20 text-[10px]">{threatFeed.length} events</span>
-            </div>
-
-            <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-3 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
-              {threatFeed.map((scan) => (
-                <ThreatFeedItem key={scan.id} scan={scan} />
-              ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Right Column: SP Liability (2 cols) */}
-          <motion.div variants={fadeUp} className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <UserX size={16} className="text-rose-400" />
-              <h3 className="text-white font-bold text-sm">SP Liability Index</h3>
-            </div>
-
-            <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-3">
-              {liability
-                .sort((a, b) => b.blocksThisWeek - a.blocksThisWeek)
-                .map((sp) => (
-                  <LiabilityRow key={sp.spId} sp={sp} />
-                ))}
-            </motion.div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Quarantine Queue */}
-      {!loading && quarantineItems.length > 0 && (
-        <motion.div variants={fadeUp} className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Eye size={16} className="text-amber-400" />
-            <h3 className="text-white font-bold text-sm">Quarantine Queue</h3>
-            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold">
-              {quarantineItems.length} pending
-            </span>
-          </div>
-
-          <motion.div variants={stagger} initial="hidden" animate="visible" className="grid gap-4 md:grid-cols-2">
-            {quarantineItems.map((scan) => (
-              <QuarantineItem key={scan.id} scan={scan} />
-            ))}
-          </motion.div>
+      {/* ── Error Banner ── */}
+      {error && (
+        <motion.div
+          variants={fadeUp}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400"
+        >
+          {error}
         </motion.div>
       )}
+
+      {/* ── Stat Cards ── */}
+      <motion.div
+        variants={stagger}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <StatCard
+          icon={XOctagon}
+          label="Threats Blocked"
+          value={stats.threatsBlocked}
+          color="border-red-500/20"
+          iconColor="bg-red-500/20 text-red-400"
+        />
+        <StatCard
+          icon={AlertTriangle}
+          label="In Quarantine"
+          value={stats.inQuarantine}
+          color="border-amber-500/20"
+          iconColor="bg-amber-500/20 text-amber-400"
+        />
+        <StatCard
+          icon={Activity}
+          label="Avg Risk Score"
+          value={stats.avgRiskScore}
+          color="border-orange-500/20"
+          iconColor="bg-orange-500/20 text-orange-400"
+        />
+        <StatCard
+          icon={Shield}
+          label="Scanner Status"
+          value="ACTIVE"
+          color="border-emerald-500/20"
+          iconColor="bg-emerald-500/20 text-emerald-400"
+        />
+      </motion.div>
+
+      {/* ── Threat Table ── */}
+      <motion.div
+        variants={fadeUp}
+        className="glass noise rounded-2xl border border-rose-500/10 overflow-hidden"
+      >
+        {/* Table Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+          <span className="w-4" /> {/* expand icon spacer */}
+          <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider w-40 shrink-0">
+            Timestamp
+          </span>
+          <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider flex-1">
+            Threat Vector(s)
+          </span>
+          <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider w-12 text-right shrink-0">
+            Risk
+          </span>
+          <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider w-24 text-right shrink-0">
+            Status
+          </span>
+        </div>
+
+        {/* Table Body */}
+        {loading && alerts.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw size={24} className="animate-spin text-rose-400/40" />
+            <span className="ml-3 text-white/30 text-sm">Loading threat telemetry...</span>
+          </div>
+        ) : alerts.length === 0 ? (
+          <div className="text-center py-16">
+            <Shield size={32} className="mx-auto text-emerald-400/40 mb-3" />
+            <p className="text-white/40 text-sm font-medium">No threats detected</p>
+            <p className="text-white/20 text-xs mt-1">
+              The 32-point AST scanner is active. Use &ldquo;Simulate Attack&rdquo; to populate demo data.
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[600px] overflow-y-auto">
+            {alerts.map((alert) => (
+              <ThreatRow
+                key={alert.id}
+                alert={alert}
+                isExpanded={expandedId === alert.id}
+                onToggle={() =>
+                  setExpandedId(expandedId === alert.id ? null : alert.id)
+                }
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Footer */}
+        {alerts.length > 0 && (
+          <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between">
+            <span className="text-white/20 text-[10px]">
+              {alerts.length} threat{alerts.length !== 1 ? "s" : ""} in ledger &middot; 30-day retention
+            </span>
+            <span className="text-white/20 text-[10px]">
+              Click any row to inspect the intercepted payload
+            </span>
+          </div>
+        )}
+      </motion.div>
     </motion.div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Default Export — Standalone page route
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function SecOpsLedger() {
   return (

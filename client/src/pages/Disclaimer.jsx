@@ -272,7 +272,7 @@ export default function Disclaimer() {
                 <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4 text-white/80">
                   <p className="font-semibold">Referral Service LLC</p>
                   <p>Attn: Legal Department</p>
-                  <p>Email: legal@referralsvc.com</p>
+                  <p>Email: support@referralsvc.com</p>
                   <p>Website: referralsvc.com</p>
                 </div>
               </section>
