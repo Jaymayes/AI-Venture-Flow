@@ -253,7 +253,18 @@ export default function DealRoomModal({ leadId, onClose, spMode = false }) {
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="flex items-center gap-2 text-white/50">
                     <Building2 size={12} className="text-white/25 shrink-0" />
-                    <span className="truncate">{data.lead.prospect_company || "—"}</span>
+                    {data.lead.prospect_company ? (
+                      <a
+                        href={data.lead.prospect_company.includes("://") ? data.lead.prospect_company : `https://${data.lead.prospect_company}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                      >
+                        {data.lead.prospect_company}
+                      </a>
+                    ) : (
+                      <span className="truncate">—</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-white/50">
                     <Briefcase size={12} className="text-white/25 shrink-0" />

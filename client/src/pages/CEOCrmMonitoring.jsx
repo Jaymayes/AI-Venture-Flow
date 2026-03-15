@@ -479,7 +479,9 @@ export default function CEOCrmMonitoring() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Delete failed");
     }
-    // Reload data after successful delete
+    // Optimistic removal: instantly remove from local state
+    setLeads((prev) => prev.filter((l) => (l.id || l.leadId) !== leadId));
+    // Then reload full data from API to sync metrics
     await loadData();
   }, [loadData]);
 
@@ -539,10 +541,10 @@ export default function CEOCrmMonitoring() {
                 : "—"}
             </div>
             <Link
-              href="/crm"
+              href="/ceo"
               className="flex items-center gap-1.5 text-white/30 text-xs hover:text-white/50 transition-colors bg-white/5 px-3 py-1.5 rounded-lg"
             >
-              <ArrowLeft size={12} /> CRM Portal
+              <ArrowLeft size={12} /> Back to CEO Dashboard
             </Link>
           </div>
         </div>
