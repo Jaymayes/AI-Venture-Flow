@@ -1,7 +1,7 @@
 /**
  * seo-client.js — Authenticated API client for the SEO Content Agent.
  *
- * Wraps all moltworker-seo-agent endpoints with Bearer auth:
+ * Wraps all svcworker-seo-agent endpoints with Bearer auth:
  *   GET  /health                    — Service health & binding status
  *   POST /seo/run                   — Trigger Authority Loop execution
  *   POST /seo/resume                — Resume from HITL interrupt
@@ -16,7 +16,7 @@
 
 import { getAuthToken } from './auth-store';
 
-const SEO_BASE = import.meta.env.VITE_SEO_API_BASE || "https://moltworker-seo-agent.jamarr.workers.dev";
+const SEO_BASE = import.meta.env.VITE_SEO_API_BASE || "https://api.referralsvc.com";
 
 async function seoFetch(method, path, body) {
   const token = getAuthToken();
@@ -133,7 +133,7 @@ export function scanSkill(skillName, sourceCode) {
 }
 
 // ---------------------------------------------------------------------------
-// CRM-Side Draft Management (CEO HITL via moltbot-sandbox admin router)
+// CRM-Side Draft Management (CEO HITL via svcbot-sandbox admin router)
 // ---------------------------------------------------------------------------
 
 const CRM_BASE = import.meta.env.VITE_TRIAGE_API_BASE || "";

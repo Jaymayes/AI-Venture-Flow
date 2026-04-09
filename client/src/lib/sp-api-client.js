@@ -1,7 +1,7 @@
 /**
  * sp-api-client.js — Authenticated API Client for SP Launchpad Dashboard
  *
- * Purpose-built fetch wrapper targeting the moltbot-triage-engine Worker.
+ * Purpose-built fetch wrapper targeting the svcbot-triage-engine Worker.
  * Reads the Bearer token from AuthContext (passed by caller) so the token
  * never touches localStorage or sessionStorage.
  *

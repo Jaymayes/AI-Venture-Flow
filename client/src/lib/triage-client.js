@@ -332,7 +332,7 @@ export function approveDraft(draftId) {
 // Phase 13: Top-of-Funnel Inbound Lead Capture
 // ---------------------------------------------------------------------------
 
-/** Submit a top-of-funnel lead to the moltbot-triage-engine. Phase 13. */
+/** Submit a top-of-funnel lead to the svcbot-triage-engine. Phase 13. */
 export function submitInboundLead(payload) {
   return triageFetch("POST", "/api/inbound/lead", payload);
 }

@@ -22,7 +22,7 @@ import { Link } from "wouter";
 
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 const STATUS_COLORS = {
   new: "bg-blue-500/20 text-blue-300",

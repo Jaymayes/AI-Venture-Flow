@@ -84,7 +84,7 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const API_BASE = import.meta.env.VITE_TRIAGE_API_BASE || "https://moltbot-triage-engine.jamarr.workers.dev";
+const API_BASE = import.meta.env.VITE_TRIAGE_API_BASE || "https://api.referralsvc.com";
 const FINOPS_URL = `${API_BASE}/api/finops/metrics`;
 const POLL_INTERVAL = 30_000;
 

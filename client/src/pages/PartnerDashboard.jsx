@@ -53,7 +53,7 @@ import {
 const PARTNER_EMAIL_KEY = "rsllc_partner_email";
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 const STAGES = [
   { key: "qualified", label: "Qualified", color: "cyan", icon: Target },

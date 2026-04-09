@@ -1,7 +1,7 @@
 /**
  * Portal.jsx — Sovereign Partner CRM Portal (Phase 11 → AI-Venture-Flow).
  *
- * Full-featured CRM dashboard backed by the D1 moltbot-crm-db.
+ * Full-featured CRM dashboard backed by the D1 svcbot-crm-db.
  * Three sections:
  *   1. Metrics Overview   — 4 KPI stat cards
  *   2. Pipeline Table     — Sortable, searchable lead table with intent badges

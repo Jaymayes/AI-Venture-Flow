@@ -25,7 +25,7 @@ import { Button } from "../components/ui/Button";
 
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 // ── Session helpers ──
 const CLIENT_TOKEN_KEY = "rsllc_client_token";

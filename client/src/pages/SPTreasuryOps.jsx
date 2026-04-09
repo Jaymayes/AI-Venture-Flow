@@ -31,7 +31,7 @@ import { Table } from "../components/ui/Table";
 
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Currency Formatter (Intl.NumberFormat — no external deps)

@@ -108,7 +108,7 @@ const SP_NAME_KEY = "rsllc_sp_name";
 const SP_TOKEN_KEY = "rsllc_sp_token";
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: BarChart3, color: "text-cyan-400" },

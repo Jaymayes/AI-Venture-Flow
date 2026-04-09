@@ -15,7 +15,7 @@ const AUTH_KEY = "rsllc_sp_auth";
 
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 export default function SPGate({ children }) {
   const [authenticated, setAuthenticated] = useState(false);

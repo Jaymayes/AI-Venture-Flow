@@ -1,7 +1,7 @@
 /**
  * RecruitmentOps.jsx — Phase 86: Scorched Earth Purge
  *
- * All legacy Triage Engine (moltbot-triage-engine) connections removed:
+ * All legacy Triage Engine (svcbot-triage-engine) connections removed:
  *   - Dead "Clawbot Target Ingestion" CSV upload zone (replaced by Load Reservoir in CEOReservoir.jsx)
  *   - Dead "Prospect Pipeline" table (replaced by Phase 84 Recent Activity feed)
  *   - Dead "Top Stats Row" (replaced by Phase 84 Pipeline Telemetry cards)
@@ -36,7 +36,7 @@ import { CEOReservoirContent } from "./CEOReservoir";
 // ---------------------------------------------------------------------------
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 // Phase 91: Auth token sourced from auth-store (no more env key exposure)
 const EFFICACY_POLL_MS = 60_000; // poll once per minute (was 30s)
 

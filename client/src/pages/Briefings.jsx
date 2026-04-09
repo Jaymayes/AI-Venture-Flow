@@ -32,7 +32,7 @@ import {
 // Live API — no mock fallback. Glass pane over bare metal.
 // ---------------------------------------------------------------------------
 
-const API_BASE = (import.meta.env.VITE_TRIAGE_API_BASE || "https://moltbot-triage-engine.jamarr.workers.dev") + "/api/outbound";
+const API_BASE = (import.meta.env.VITE_TRIAGE_API_BASE || "https://api.referralsvc.com") + "/api/outbound";
 // Phase 91: API_KEY removed — auth token sourced from auth-store
 
 // ---------------------------------------------------------------------------

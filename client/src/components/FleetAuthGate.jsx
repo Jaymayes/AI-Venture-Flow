@@ -16,7 +16,7 @@ const AUTH_KEY = "rsllc_fleet_email";
 
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 export default function FleetAuthGate({ children }) {
   const [authenticated, setAuthenticated] = useState(false);

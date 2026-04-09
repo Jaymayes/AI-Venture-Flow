@@ -19,7 +19,7 @@ import { setAuthToken } from "../lib/auth-store";
 const AUTH_KEY = "rsllc_ceo_jwt";
 const API_BASE =
   import.meta.env.VITE_TRIAGE_API_BASE ||
-  "https://moltbot-triage-engine.jamarr.workers.dev";
+  "https://api.referralsvc.com";
 
 /**
  * Decode JWT payload without verification (for client-side exp check only).
