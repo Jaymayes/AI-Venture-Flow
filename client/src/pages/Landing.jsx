@@ -155,7 +155,7 @@ const complianceItems = [
   },
 ];
 
-const navLinks = ["Audit", "Modules", "How It Works", "Pricing", "Compliance"];
+const navLinks = ["Audit", "Modules", "How It Works", "Pricing", "Compliance", "Incubator"];
 
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -207,13 +207,19 @@ export default function Landing() {
           {/* desktop links */}
           <div className="hidden items-center gap-6 md:flex">
             {navLinks.map((l) => (
-              <button
-                key={l}
-                onClick={() => scrollTo(l.toLowerCase())}
-                className="text-sm text-white/70 transition hover:text-white"
-              >
-                {l}
-              </button>
+              l === 'Incubator' ? (
+                <a key={l} href="/portal/incubator/apply" className="text-sm font-semibold text-orange-400 transition hover:text-orange-300">
+                  {l}
+                </a>
+              ) : (
+                <button
+                  key={l}
+                  onClick={() => scrollTo(l.toLowerCase())}
+                  className="text-sm text-white/70 transition hover:text-white"
+                >
+                  {l}
+                </button>
+              )
             ))}
             <Link
               href="/dashboard"
@@ -293,13 +299,19 @@ export default function Landing() {
             className="border-t border-white/10 px-6 pb-4 md:hidden"
           >
             {navLinks.map((l) => (
-              <button
-                key={l}
-                onClick={() => scrollTo(l.toLowerCase())}
-                className="block w-full py-3 text-left text-sm text-white/70 hover:text-white"
-              >
-                {l}
-              </button>
+              l === 'Incubator' ? (
+                <a key={l} href="/portal/incubator/apply" className="block w-full py-3 text-left text-sm font-semibold text-orange-400 hover:text-orange-300">
+                  {l}
+                </a>
+              ) : (
+                <button
+                  key={l}
+                  onClick={() => scrollTo(l.toLowerCase())}
+                  className="block w-full py-3 text-left text-sm text-white/70 hover:text-white"
+                >
+                  {l}
+                </button>
+              )
             ))}
             <Link
               href="/dashboard"
@@ -390,6 +402,12 @@ export default function Landing() {
             >
               Explore services <ChevronRight size={16} />
             </button>
+            <a
+              href="/portal/incubator/apply"
+              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-3 font-semibold text-white transition hover:from-orange-400 hover:to-amber-400 shadow-lg shadow-orange-500/20"
+            >
+              Apply to Incubator
+            </a>
           </motion.div>
 
           {/* floating stats */}
