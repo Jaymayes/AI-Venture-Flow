@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock, Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Shield, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { setAuthToken } from "../lib/auth-store";
 
 // ---------------------------------------------------------------------------
-// CEO Authentication Gate (Phase 91: Zero-Leak Auth)
+// CEO Authentication Gate — PASSWORDLESS (ARCHITECTURE.md Pillar 1)
 // ---------------------------------------------------------------------------
-// Email + password auth gate for CEO-protected pages (/ceo, /triage, etc.).
-// Validates credentials via POST /api/auth/ceo-login (server-side).
-// Stores the session JWT in sessionStorage for cross-refresh persistence
-// and in the module-level auth-store for API client libraries.
+// Magic-link auth for CEO-protected pages (/ceo, /triage, etc.). The operator
+// requests a single-use link via POST /api/v1/auth/magic/request. The link is
+// short-lived (10 min), hash-only stored server-side, and contextually bound to
+// the requesting IP + User-Agent (verified at /api/v1/auth/magic/verify, which
+// fails secure on mismatch to block link forwarding).
 //
-// SECURITY: No hardcoded credentials. All validation is server-side.
-// The JWT is signed, time-limited (8h), and cryptographically verified.
+// NO PASSWORD is ever collected or transmitted — passwords do not exist in
+// Sovereign OS. A valid session JWT (minted by the verify landing page) is stored
+// in sessionStorage + the module-level auth-store for API client libraries.
 // ---------------------------------------------------------------------------
 
 const AUTH_KEY = "rsllc_ceo_jwt";
@@ -22,7 +24,7 @@ const API_BASE =
   "https://api.referralsvc.com";
 
 /**
- * Decode JWT payload without verification (for client-side exp check only).
+ * Decode JWT payload without verification (client-side exp check only).
  * Actual signature verification happens server-side on every API call.
  */
 function decodeJWTPayload(jwt) {
@@ -39,9 +41,8 @@ function decodeJWTPayload(jwt) {
 export default function AuthGate({ children }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [sent, setSent] = useState(false);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -51,11 +52,9 @@ export default function AuthGate({ children }) {
     if (stored) {
       const payload = decodeJWTPayload(stored);
       if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
-        // JWT is still valid — restore session
         setAuthToken(stored);
         setAuthenticated(true);
       } else {
-        // JWT expired — clear it
         sessionStorage.removeItem(AUTH_KEY);
       }
     }
@@ -69,43 +68,29 @@ export default function AuthGate({ children }) {
       setError("Please enter a valid email address.");
       return;
     }
-    if (!password) {
-      setError("Password required.");
-      return;
-    }
 
     setLoading(true);
     setError(null);
 
+    // Request a passwordless magic link. The endpoint is intentionally NEUTRAL
+    // (no account enumeration) — same response whether or not the address maps to
+    // a user — so we show the same confirmation regardless of outcome.
     try {
-      const res = await fetch(`${API_BASE}/api/auth/ceo-login`, {
+      await fetch(`${API_BASE}/api/v1/auth/magic/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, password }),
+        body: JSON.stringify({ email: trimmedEmail }),
       });
-
-      const data = await res.json();
-
-      if (res.ok && data.token) {
-        // Store JWT in memory + sessionStorage
-        setAuthToken(data.token);
-        sessionStorage.setItem(AUTH_KEY, data.token);
-        setAuthenticated(true);
-        setError(null);
-      } else {
-        setError(data.error || "Invalid credentials.");
-        setPassword("");
-      }
     } catch {
-      setError("Unable to connect to authentication service.");
-    } finally {
+      setError("Unable to reach the auth service. Please try again in a moment.");
       setLoading(false);
+      return;
     }
+    setLoading(false);
+    setSent(true);
   };
 
-  // Don't flash the gate while checking sessionStorage
   if (checking) return null;
-
   if (authenticated) return children;
 
   return (
@@ -133,7 +118,7 @@ export default function AuthGate({ children }) {
           Executive Access
         </h1>
         <p className="text-white/40 text-sm text-center mb-8">
-          Referral Service LLC — CEO Portal
+          Referral Service LLC — CEO Portal · Passwordless
         </p>
 
         {/* Identity badge */}
@@ -149,79 +134,91 @@ export default function AuthGate({ children }) {
           </div>
         </div>
 
-        {/* Login form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-white/50 mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                <Mail size={16} className="text-white/30" />
+        {sent ? (
+          /* Stateful "check your inbox" landing (Pillar 1 — stateful landing page) */
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-5 text-center"
+          >
+            <Mail size={28} className="text-emerald-400 mx-auto mb-3" />
+            <p className="text-white font-semibold text-sm mb-1">Check your inbox</p>
+            <p className="text-white/50 text-xs leading-relaxed">
+              If an account exists for{" "}
+              <span className="text-white/70">{email.trim().toLowerCase()}</span>, a single-use
+              magic link — bound to your current IP &amp; device and valid for 10 minutes — has
+              been dispatched. Awaiting contextual IP/UA validation on click.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setSent(false); setEmail(""); }}
+              className="mt-4 text-cyan-400/70 text-xs hover:text-cyan-400 transition-colors"
+            >
+              Use a different email
+            </button>
+          </motion.div>
+        ) : (
+          /* Login form — EMAIL ONLY, no password field */
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-white/50 mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                  <Mail size={16} className="text-white/30" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="you@referralsvc.com"
+                  autoFocus
+                  disabled={loading}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all disabled:opacity-50"
+                />
               </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError(null);
-                }}
-                placeholder="you@referralsvc.com"
-                autoFocus
-                disabled={loading}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all disabled:opacity-50"
-              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-white/50 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                <Lock size={16} className="text-white/30" />
-              </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Enter password"
-                disabled={loading}
-                className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20 transition-all disabled:opacity-50"
-              />
+            {/* Error */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-400 text-xs bg-red-400/5 border border-red-400/10 rounded-lg p-3 text-center"
+              >
+                {error}
+              </motion.div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {loading ? "Requesting…" : "Request Secure Magic Link"}
+            </button>
+
+            {/* DEV-ONLY preview bypass. import.meta.env.DEV is FALSE in every
+                production build (`npm run build` / `vite build`), so this whole
+                block is dead-code-eliminated from the deployed bundle and can
+                NEVER act as an auth bypass in production. Local `npm run dev` only.
+                Renders the gated page in-place so we can see UI work mid-wiring. */}
+            {import.meta.env.DEV && (
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                onClick={() => setAuthenticated(true)}
+                className="block w-full text-center text-amber-400/70 text-[11px] hover:text-amber-400 transition-colors"
+                title="Dev-only: renders the gated page locally. Stripped from production builds."
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                Bypass (Dev Mode) — local preview only
               </button>
-            </div>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-red-400 text-xs bg-red-400/5 border border-red-400/10 rounded-lg p-3 text-center"
-            >
-              {error}
-            </motion.div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {loading ? "Authenticating..." : "Sign In"}
-          </button>
-        </form>
+            )}
+          </form>
+        )}
 
         {/* Back link */}
         <div className="mt-6 text-center">
