@@ -28,6 +28,7 @@ import DealRoom from "./pages/DealRoom";
 import DealView from "./pages/DealView";
 import KickoffPortal from "./pages/KickoffPortal";
 import ClientPortal from "./pages/ClientPortal";
+import MagicVerify from "./pages/MagicVerify";
 import CardView from "./pages/CardView";
 import CrmGateway from "./pages/CrmGateway";
 import SPPortal from "./pages/SPPortal";
@@ -110,6 +111,9 @@ export default function App() {
           <Route path="/deal/:id" component={DealView} />
           {/* ── Phase 49: Kickoff Engine — post-purchase intake portal ── */}
           <Route path="/kickoff/:id" component={KickoffPortal} />
+          {/* ── Passwordless magic-link verify (Pillar 1) — MUST precede /portal/:id
+                so the emailed /portal/magic?token= link isn't shadowed by ClientPortal ── */}
+          <Route path="/portal/magic" component={MagicVerify} />
           {/* ── Phase 51: Client Portal — public project dashboard ── */}
           <Route path="/portal/:id" component={ClientPortal} />
           {/* ── Phase 24: Deal Room — public magic-link access (no auth) ── */}
