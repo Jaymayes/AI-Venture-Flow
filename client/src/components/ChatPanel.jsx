@@ -172,6 +172,15 @@ export default function ChatPanel() {
               </button>
             </div>
 
+            {/* AZ HB 2311 — mandatory AI disclosure (operator in Surprise, AZ).
+                No "AUDIT LOGGED" badge: nothing is actually logged yet. */}
+            <div className="border-b border-amber-400/20 bg-amber-400/10 px-4 py-2">
+              <p className="text-[11px] leading-snug text-amber-300/90">
+                <span className="font-semibold">AZ HB 2311 DISCLOSURE:</span> You are interacting with
+                an Artificial Intelligence system. It is not human.
+              </p>
+            </div>
+
             {/* messages */}
             <div
               ref={scrollRef}

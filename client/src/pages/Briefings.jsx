@@ -640,6 +640,48 @@ export default function Briefings() {
         </motion.div>
       </motion.div>
 
+      {/* Sovereign Crucible — governance state (HITL transparency) */}
+      <motion.div initial="hidden" animate="visible" variants={stagger} className="mb-6">
+        <motion.div variants={fadeUp} className="glass noise rounded-2xl p-5 border border-amber-400/20">
+          {/* Shadow Mode banner — standing zero-trust HITL posture, not an error */}
+          <div className="flex items-start gap-3 rounded-xl bg-amber-400/10 border border-amber-400/30 px-4 py-3">
+            <AlertTriangle size={20} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-amber-300 font-bold text-sm">
+                ⚠️ SHADOW MODE ACTIVE: Pipeline paused pending human CEO authorization.
+              </p>
+              <p className="text-white/40 text-xs mt-1">
+                This is the standing zero-trust HITL design, not an outage — AI-drafted outreach is
+                held for human approval and is never auto-sent.
+              </p>
+            </div>
+          </div>
+
+          {/* ReviewEngine verification badges — mapped to live AI Bouncer auditor stats */}
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <span className="text-white/50 text-xs uppercase tracking-wider">ReviewEngine</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-emerald-400 text-xs font-semibold">
+              <ShieldCheck size={13} /> Passed Verification: {bouncerStats ? fmt(bouncerStats.allowed) : "—"}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 border border-red-500/30 px-3 py-1 text-red-400 text-xs font-semibold">
+              <ShieldX size={13} /> REJECTED: {bouncerStats ? fmt((bouncerStats.rejectedDeterministic || 0) + (bouncerStats.rejectedLLM || 0)) : "—"}
+            </span>
+            <span className="text-white/30 text-[11px]">AI Auditor actively intercepting off-ICP outreach</span>
+          </div>
+
+          {/* Ignite CTA — PLACEHOLDER: backend batch-drafting endpoint is a stub (not wired) */}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={() => alert("Ignite Sequence Authorized: Awaiting Backend API Integration.")}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-black text-sm font-bold shadow-lg shadow-primary/30 transition hover:scale-[1.02] hover:opacity-90"
+            >
+              <Flame size={16} /> Ignite Test Batch
+            </button>
+            <span className="text-white/30 text-[11px]">Placeholder — backend batch-drafting endpoint not yet integrated.</span>
+          </div>
+        </motion.div>
+      </motion.div>
+
       {/* Content */}
       <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
         {/* 1. AI Bouncer Ledger */}

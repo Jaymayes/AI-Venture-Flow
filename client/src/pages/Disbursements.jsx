@@ -563,6 +563,14 @@ function PartnerFinOpsLedger() {
         </motion.div>
       )}
 
+      {/* FinOps governance note — softened to what's actually implemented
+          (append-only ledger + CFO daily budget throttle). No signing/YAML claims. */}
+      <p className="mt-3 text-white/40 text-xs max-w-3xl">
+        Sovereign Treasury utilizes an append-only ledger. The CFO Node is actively throttling the
+        pipeline to enforce daily FinOps budget caps — low or $0 figures reflect this governance,
+        not an outage.
+      </p>
+
       {/* ── Flagged Margin Warning ── */}
       {summary && (summary.flaggedCount || 0) > 0 && (
         <motion.div
