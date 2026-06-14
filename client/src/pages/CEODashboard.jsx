@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { getAuthToken } from "../lib/auth-store";
 import Briefings from "./Briefings";
 import RecruitmentOps from "./RecruitmentOps";
+import AgentObservability from "../components/AgentObservability";
 import { DisbursementsContent } from "./Disbursements";
 import { SPOnboardingContent } from "./SPOnboarding";
 import { RevenueSalvageContent } from "./RevenueSalvage";
@@ -334,6 +335,7 @@ const ceoTabs = [
   { id: "delegation", label: "SP Teams", icon: Users, color: "cyan" },
   { id: "seo-approvals", label: "SEO Agent", icon: PenTool, color: "emerald" },
   { id: "fleet-apps", label: "Fleet Apps", icon: ClipboardList, color: "lime" },
+  { id: "agent-observability", label: "Control Room", icon: Activity, color: "cyan" },
   { id: "campaign", label: "Campaign", icon: Megaphone, color: "blue", href: "/campaign" },
   { id: "triage", label: "Triage", icon: Target, color: "pink", href: "/triage" },
 ];
@@ -1094,6 +1096,7 @@ export default function CEODashboard() {
       {activeTab === "delegation" && <TeamDelegationContent />}
       {activeTab === "seo-approvals" && <SEOApprovalContent />}
       {activeTab === "fleet-apps" && <FleetAppsContent />}
+      {activeTab === "agent-observability" && <AgentObservability />}
 
       {activeTab === "dashboard" && (
       loading && !metrics ? (
