@@ -1329,20 +1329,21 @@ export default function CEODashboard() {
           variants={stagger}
           className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-13"
         >
+          {/* Incident 001: hydration-failure fallback is UNKNOWN (honest), NOT a false all-green */}
           {Object.entries(globalRollup?.systemStatus ?? {
-            tofuRadar: 'ONLINE',
-            finopsLedger: 'ONLINE',
-            escalationProtocol: 'ONLINE',
-            dealRoom: 'ONLINE',
-            tofuIntake: 'ONLINE',
-            partnerPortal: 'ONLINE',
-            dripEngine: 'ONLINE',
-            slackCommandCenter: 'ONLINE',
-            dispatchEngine: 'ONLINE',
-            stripeWebhook: 'ONLINE',
-            kickoffEngine: 'ONLINE',
-            autonomousTreasury: 'ONLINE',
-            escrowEngine: 'ONLINE',
+            tofuRadar: 'UNKNOWN',
+            finopsLedger: 'UNKNOWN',
+            escalationProtocol: 'UNKNOWN',
+            dealRoom: 'UNKNOWN',
+            tofuIntake: 'UNKNOWN',
+            partnerPortal: 'UNKNOWN',
+            dripEngine: 'UNKNOWN',
+            slackCommandCenter: 'UNKNOWN',
+            dispatchEngine: 'UNKNOWN',
+            stripeWebhook: 'UNKNOWN',
+            kickoffEngine: 'UNKNOWN',
+            autonomousTreasury: 'UNKNOWN',
+            escrowEngine: 'UNKNOWN',
           }).map(([key, status]) => {
             const labels = {
               tofuRadar: "ToFu Radar",
@@ -1359,7 +1360,11 @@ export default function CEODashboard() {
               autonomousTreasury: "Auto Treasury",
               escrowEngine: "Escrow Engine",
             };
-            const isOnline = status === 'ONLINE';
+            // Incident 001: 3-way status → ONLINE green · UNKNOWN neutral gray · else (DEGRADED) red
+            const nc =
+              status === 'ONLINE'   ? { dot: 'bg-emerald-400 shadow-lg shadow-emerald-400/30', text: 'text-emerald-400' }
+              : status === 'UNKNOWN' ? { dot: 'bg-slate-400', text: 'text-slate-400' }
+              :                        { dot: 'bg-red-400', text: 'text-red-400' };
             return (
               <motion.div
                 key={key}
@@ -1367,10 +1372,8 @@ export default function CEODashboard() {
                 className="rounded-md bg-slate-900 border border-slate-700/50 p-3"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`inline-block w-2 h-2 rounded-full ${
-                    isOnline ? "bg-emerald-400 shadow-lg shadow-emerald-400/30" : "bg-red-400"
-                  }`} />
-                  <span className={`text-xs font-bold ${isOnline ? "text-emerald-400" : "text-red-400"}`}>
+                  <span className={`inline-block w-2 h-2 rounded-full ${nc.dot}`} />
+                  <span className={`text-xs font-bold ${nc.text}`}>
                     {status}
                   </span>
                 </div>
