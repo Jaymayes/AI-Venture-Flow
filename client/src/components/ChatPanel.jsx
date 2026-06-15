@@ -87,6 +87,28 @@ export default function ChatPanel() {
     return () => window.removeEventListener("openChat", handleOpenChat);
   }, [handleOpenChat]);
 
+  // ── AZ HB 2311 — recurring 3-hour re-disclosure during an active session ──
+  // The persistent banner above is the primary control; this re-injects the AI
+  // disclosure into the transcript every 3 hours the chat stays open, so a
+  // long-running conversation is periodically reminded it's talking to an AI.
+  // (Efficacy caveat: web chat sessions rarely last 3h, so this seldom fires —
+  // the always-on banner remains the real safeguard. Interval clears on close.)
+  const HB2311_REDISCLOSURE_MS = 3 * 60 * 60 * 1000; // 3 hours
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "AZ HB 2311 DISCLOSURE: You are interacting with an Artificial Intelligence system. It is not human.",
+        },
+      ]);
+    }, HB2311_REDISCLOSURE_MS);
+    return () => clearInterval(id);
+  }, [open]);
+
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
