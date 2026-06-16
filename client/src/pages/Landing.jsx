@@ -361,7 +361,7 @@ export default function Landing() {
           <motion.div variants={fadeUp} custom={0} className="mb-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-white/60">
               <Zap size={14} className="text-accent" />
-              AI-Powered Digital Employees
+              Zero-Marginal-Cost Intelligence
             </span>
           </motion.div>
 
@@ -370,9 +370,9 @@ export default function Landing() {
             custom={1}
             className="gradient-text mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-7xl"
           >
-            Modular AI
+            Autonomous SaaS
             <br />
-            Venture Studio
+            Affiliate Swarm
           </motion.h1>
 
           <motion.p
@@ -380,9 +380,9 @@ export default function Landing() {
             custom={2}
             className="mx-auto mb-10 max-w-xl text-lg text-white/60 md:text-xl"
           >
-            Ship ventures with composable building blocks. Deploy AI Digital
-            Employees that sell, support, and manage knowledge -- in days, not
-            months.
+            Compliant, AI-generated SaaS recommendations that earn high-ticket
+            recurring commissions -- published at the edge, gated by deterministic
+            compliance. Zero inventory, zero marginal cost.
           </motion.p>
 
           <motion.div
@@ -394,7 +394,7 @@ export default function Landing() {
               onClick={() => scrollTo("audit")}
               className="rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
             >
-              Free SaaS Teardown
+              See Live SaaS Picks
             </button>
             <button
               onClick={() => scrollTo("modules")}

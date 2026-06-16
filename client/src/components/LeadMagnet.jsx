@@ -193,7 +193,7 @@ export default function LeadMagnet() {
                   type="submit"
                   className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-8 py-3 font-semibold text-black transition hover:opacity-90"
                 >
-                  Generate Free SaaS Teardown <Zap size={16} />
+                  Generate SaaS Comparison <Zap size={16} />
                 </button>
 
                 <p className="text-center text-[11px] text-white/30">
