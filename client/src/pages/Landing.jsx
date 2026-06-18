@@ -361,7 +361,7 @@ export default function Landing() {
           <motion.div variants={fadeUp} custom={0} className="mb-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-white/60">
               <Zap size={14} className="text-accent" />
-              Autonomous Digital Affiliate Swarm
+              Autonomous Affiliate Engine · DARE model (Design, Activate, Realize, Evolve)
             </span>
           </motion.div>
 
@@ -381,8 +381,8 @@ export default function Landing() {
             className="mx-auto mb-10 max-w-xl text-lg text-white/60 md:text-xl"
           >
             An autonomous swarm that publishes compliant, AI-generated recommendations
-            for High-Ticket SaaS (Systeme.io, HubSpot), Premium E-Learning (Authority
-            Hacker, Coursera), and B2B Freelance networks (Toptal, MarketerHire) -- earning recurring
+            across our high-yield matrix: Systeme.io (60% recurring), GoHighLevel, HubSpot,
+            WP Engine, Authority Hacker, and Toptal ($2k bounty) -- earning recurring
             commissions at the edge with zero inventory and zero marginal cost.
           </motion.p>
 
