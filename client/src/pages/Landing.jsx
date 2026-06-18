@@ -382,7 +382,7 @@ export default function Landing() {
           >
             An autonomous swarm that publishes compliant, AI-generated recommendations
             for High-Ticket SaaS (Systeme.io, HubSpot), Premium E-Learning (Authority
-            Hacker), and Elite B2B Freelance networks (Toptal) -- earning recurring
+            Hacker, Coursera), and B2B Freelance networks (Toptal, MarketerHire) -- earning recurring
             commissions at the edge with zero inventory and zero marginal cost.
           </motion.p>
 
