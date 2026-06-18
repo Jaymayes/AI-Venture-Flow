@@ -43,7 +43,7 @@ export default function LeadMagnet() {
       setLatency(elapsed);
 
       if (res.ok && data.ok) {
-        setReport(data.report || "Teardown complete. Report generated.");
+        setReport(data.report || "Recommendation complete. Report generated.");
         setStatus("done");
       } else {
         setErrorMsg(data.error || "Unexpected error. Please try again.");
@@ -60,7 +60,7 @@ export default function LeadMagnet() {
     "Scanning edge nodes...",
     "Resolving tech stack via BuiltWith...",
     "Crawling site with Firecrawl...",
-    "Generating AI teardown via Groq LPU...",
+    "Generating AI affiliate picks via Groq LPU...",
   ];
 
   return (
@@ -77,10 +77,10 @@ export default function LeadMagnet() {
             <Zap size={14} /> Free Instant Analysis
           </span>
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Get Your <span className="gradient-text">SaaS Teardown</span>
+            Get Your <span className="gradient-text">Live SaaS Picks</span>
           </h2>
           <p className="mx-auto max-w-lg text-white/50">
-            Enter any website and get an AI-generated competitive teardown in under 2 seconds.
+            Enter any niche and get AI-generated high-ticket affiliate recommendations in under 2 seconds.
             Powered by edge functions, BuiltWith, Firecrawl, and Groq LPUs.
           </p>
         </motion.div>
@@ -100,7 +100,7 @@ export default function LeadMagnet() {
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle size={20} className="text-accent" />
-                    <span className="text-sm font-semibold text-accent">Teardown Complete</span>
+                    <span className="text-sm font-semibold text-accent">Recommendation Complete</span>
                   </div>
                   {latency && (
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/50">

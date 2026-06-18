@@ -361,7 +361,7 @@ export default function Landing() {
           <motion.div variants={fadeUp} custom={0} className="mb-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-white/60">
               <Zap size={14} className="text-accent" />
-              Zero-Marginal-Cost Intelligence
+              Autonomous Digital Affiliate Swarm
             </span>
           </motion.div>
 
@@ -370,9 +370,9 @@ export default function Landing() {
             custom={1}
             className="gradient-text mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-7xl"
           >
-            Autonomous SaaS
+            Zero Marginal Cost
             <br />
-            Affiliate Swarm
+            Affiliate Engine
           </motion.h1>
 
           <motion.p
@@ -380,9 +380,10 @@ export default function Landing() {
             custom={2}
             className="mx-auto mb-10 max-w-xl text-lg text-white/60 md:text-xl"
           >
-            Compliant, AI-generated SaaS recommendations that earn high-ticket
-            recurring commissions -- published at the edge, gated by deterministic
-            compliance. Zero inventory, zero marginal cost.
+            An autonomous swarm that publishes compliant, AI-generated recommendations
+            for High-Ticket SaaS (Systeme.io, HubSpot), Premium E-Learning (Authority
+            Hacker), and Elite B2B Freelance networks (Toptal) -- earning recurring
+            commissions at the edge with zero inventory and zero marginal cost.
           </motion.p>
 
           <motion.div
